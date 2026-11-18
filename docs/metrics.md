@@ -1,28 +1,23 @@
 # LeanDNS 크기·리소스 측정
 
-측정일(호스트): 2026-11-18T00:14:00+09:00  
-OpenWrt Image Builder: 24.10.0 / `asus_rt-ac1200-v2`  
-프로파일: **DNS appliance (Wi-Fi/PPP 제거)**
+측정일(호스트): 2026-11-18T11:05:22+09:00
+호스트: Linux 6.8.0-149-generic x86_64
 
-## 호스트 실측
+## 호스트에서 실측됨
 
-| 항목 | 이전 (Wi-Fi 포함) | 현재 (슬림) |
-|------|-------------------|-------------|
-| factory.bin | 4.9 MB | **4.2 MB** |
-| sysupgrade.bin | 4.9 MB | **4.2 MB** |
-| squashfs rootfs (압축) | ~2954 KB | **~2237 KB** |
-| Wi-Fi 패키지 | mt76/mac80211 등 포함 | **없음 (manifest 확인)** |
+| 항목 | 값 |
+|------|-----|
+| 웹 UI (`web/`) | 67960 bytes |
+| 패키지 files 트리 | 472940 bytes |
+| 펌웨어 이미지 | not built yet |
 
-경로: `firmware/bin/`
+## 실기에서만 측정 가능 (미측정)
 
-포함: LeanDNS UI, `uhttpd-mod-ubus`, `leandns-discoverd`, 네트워크 설정 API.
+| 항목 | 상태 |
+|------|------|
+| DNS/관리 프로세스 RSS | 측정 불가 (실기 필요) |
+| 차단목록 업데이트 peak RAM | 측정 불가 (실기 필요) |
+| 부팅 후 가용 RAM | 측정 불가 (실기 필요) |
+| Flash overlay 여유 | 측정 불가 (실기 필요) |
 
-## 제거된 주요 구성
-
-- Wi-Fi: mt76*, mac80211, cfg80211, hostapd/wpad, iw/iwinfo, wifi-scripts, wireless-regdb
-- PPP: ppp, pppoe 및 관련 kmod
-- IPv6 헬퍼: odhcpd-ipv6only, odhcp6c
-
-## 실기 미측정
-
-부팅 후 free RAM / overlay / adblock peak RSS — 실기 필요.
+임의로 목표 달성을 표시하지 않는다. RT-AC750L 검증 전까지 실기 항목은 미완료로 둔다.

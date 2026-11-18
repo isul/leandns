@@ -53,11 +53,17 @@ define Package/leandns-manager/install
 	$(INSTALL_DIR) $(1)/usr/libexec/rpcd
 	$(INSTALL_DIR) $(1)/usr/sbin
 	$(INSTALL_DIR) $(1)/usr/bin
+	$(INSTALL_DIR) $(1)/www
+	$(INSTALL_DIR) $(1)/www/cgi-bin
 	$(INSTALL_DIR) $(1)/www/leandns
 	$(INSTALL_DIR) $(1)/www/leandns/css
 	$(INSTALL_DIR) $(1)/www/leandns/js
 
+	$(INSTALL_BIN) ./files/www/cgi-bin/luci $(1)/www/cgi-bin/luci
 	$(INSTALL_CONF) ./files/etc/config/leandns $(1)/etc/config/leandns
+
+
+
 	$(INSTALL_BIN) ./files/etc/init.d/leandns $(1)/etc/init.d/leandns
 	$(INSTALL_BIN) ./files/etc/init.d/leandns-discover $(1)/etc/init.d/leandns-discover
 	$(INSTALL_BIN) ./files/etc/init.d/adblock-lean $(1)/etc/init.d/adblock-lean
@@ -65,6 +71,7 @@ define Package/leandns-manager/install
 	$(INSTALL_DATA) ./files/etc/leandns/hosts $(1)/etc/leandns/hosts
 	$(INSTALL_DATA) ./files/etc/leandns/allow.list $(1)/etc/leandns/allow.list
 	$(INSTALL_DATA) ./files/etc/leandns/block.list $(1)/etc/leandns/block.list
+	$(INSTALL_DATA) ./files/etc/leandns/version $(1)/etc/leandns/version
 	$(INSTALL_DATA) ./files/etc/adblock-lean/config $(1)/etc/adblock-lean/config
 	$(INSTALL_DATA) ./files/etc/adblock-lean/config $(1)/etc/adblock-lean/config.mini
 	$(INSTALL_DATA) ./files/usr/lib/adblock-lean/abl-lib.sh $(1)/usr/lib/adblock-lean/abl-lib.sh
@@ -79,14 +86,17 @@ define Package/leandns-manager/install
 	$(INSTALL_BIN) ./files/usr/libexec/leandns/adblock-ctl.sh $(1)/usr/libexec/leandns/adblock-ctl.sh
 	$(INSTALL_BIN) ./files/usr/libexec/leandns/backup.sh $(1)/usr/libexec/leandns/backup.sh
 	$(INSTALL_BIN) ./files/usr/libexec/leandns/status.sh $(1)/usr/libexec/leandns/status.sh
+	$(INSTALL_BIN) ./files/usr/libexec/leandns/www-root.sh $(1)/usr/libexec/leandns/www-root.sh
 	$(INSTALL_BIN) ./files/usr/bin/leandns-validate $(1)/usr/bin/leandns-validate
 	$(INSTALL_DATA) ./files/etc/leandns/upstream.list $(1)/etc/leandns/upstream.list
 	$(CP) ./files/www/leandns/* $(1)/www/leandns/
+	$(CP) -a ./files/www/index.html ./files/www/css ./files/www/js $(1)/www/
 endef
 
 define Package/leandns-manager/postinst
 #!/bin/sh
 [ -n "$${IPKG_INSTROOT}" ] || {
+	/usr/libexec/leandns/www-root.sh >/dev/null 2>&1 || true
 	/etc/init.d/leandns enable >/dev/null 2>&1 || true
 	/etc/init.d/leandns-discover enable >/dev/null 2>&1 || true
 	/etc/init.d/leandns-discover restart >/dev/null 2>&1 || true
@@ -103,8 +113,19 @@ define Package/leandns-manager/prerm
 	/etc/init.d/leandns-discover disable >/dev/null 2>&1 || true
 	/etc/init.d/leandns stop >/dev/null 2>&1 || true
 	/etc/init.d/leandns disable >/dev/null 2>&1 || true
+	for f in /www/index.html /www/css /www/js; do
+		[ -L "$$f" ] || continue
+		case "$$(readlink "$$f")" in
+			leandns|leandns/*) rm -f "$$f" ;;
+		esac
+	done
+	if [ -f /www/cgi-bin/luci ] && grep -q 'LeanDNS: luci-base' /www/cgi-bin/luci; then
+		rm -f /www/cgi-bin/luci
+	fi
 }
 exit 0
 endef
+
+
 
 $(eval $(call BuildPackage,leandns-manager))

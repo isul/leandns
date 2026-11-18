@@ -9,6 +9,7 @@ NAME=leandns
 PROG=/usr/libexec/leandns/apply-dns.sh
 
 start_service() {
+	/usr/libexec/leandns/apply-network.sh --recover >/dev/null 2>&1 || true
 	enabled="$(uci -q get leandns.main.enabled)"
 	[ "$enabled" = "0" ] && return 0
 

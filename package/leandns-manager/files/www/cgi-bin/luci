@@ -1,0 +1,9 @@
+#!/bin/sh
+# LeanDNS: luci-base ships /cgi-bin/luci but full LuCI UI is not installed.
+# Redirect old OpenWrt bookmarks and cached / → /cgi-bin/luci/ hits to the UI.
+printf 'Status: 302 Found\r\n'
+printf 'Location: /leandns/\r\n'
+printf 'Cache-Control: no-store\r\n'
+printf 'Content-Type: text/html; charset=utf-8\r\n'
+printf '\r\n'
+printf '<!DOCTYPE html><title>LeanDNS</title><a href="/leandns/">LeanDNS</a>\n'

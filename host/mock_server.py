@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import base64
+import ipaddress
 import json
 import re
 import secrets
@@ -33,13 +34,21 @@ def valid_ipv4(ip: str) -> bool:
     return all(0 <= int(x) <= 255 for x in ip.split("."))
 
 
+def valid_ipv6(ip: str) -> bool:
+    try:
+        ipaddress.IPv6Address(ip)
+        return True
+    except ValueError:
+        return False
+
+
 def valid_upstream(s: str) -> bool:
     host, _, port = s.partition("#")
     if port and not port.isdigit():
         return False
     if port and not (1 <= int(port) <= 65535):
         return False
-    return valid_ipv4(host) or valid_domain(host)
+    return valid_ipv4(host) or valid_ipv6(host) or valid_domain(host)
 
 
 STATE = {
@@ -58,7 +67,8 @@ STATE = {
     "adblock_enabled": True,
     "adblock_available": True,
     "rule_count": 85000,
-    "last_update": time.strftime("%Y-%m-%dT%H:%M:%S"),
+    "last_update": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+    "adblock_update_result": "unknown",
     "allow": ["example-allowed.test"],
     "block": ["ads.example.test"],
     "logs": [
@@ -74,7 +84,9 @@ STATE = {
         "gateway": "192.168.0.1",
     },
     "udp_token": "demoToken0123456789abcd",
+    "udp_set_enabled": True,
     "udp_token_required": True,
+    "network_pending": None,
 }
 
 
@@ -91,22 +103,29 @@ def status_payload():
         "mem_total_kb": 65536,
         "mem_available_kb": 22000,
         "cpu_percent": "unsupported",
+        "flash_scope": "overlay",
         "flash_total_kb": 16064,
         "flash_free_kb": 4200,
         "cachesize": STATE["dns"]["cachesize"],
+        "version": "1.0.0",
+        "firmware": "OpenWrt 24.10.0 (mock)",
         "cache_hit_rate": "unsupported",
         "blocked_query_count": "unsupported",
         "per_client_stats": "unsupported",
-        "dns_test_ok": "true",
-        "dns_test_latency_ms": "12",
+        "upstream": STATE["dns"]["upstream"],
+        "internal_domain": STATE["dns"]["internal_domain"],
+        "dns_test_ok": STATE["dnsmasq_running"],
+        "dns_test_latency_ms": 0,
         "dns_test_host": STATE["dns"]["dns_test_host"],
         "adblock": {
             "adblock_available": STATE["adblock_available"],
             "adblock_state": "enabled" if STATE["adblock_enabled"] else "disabled",
-            "leandns_enabled": "1",
-            "rule_count": str(STATE["rule_count"]),
-            "last_update": STATE["last_update"],
-            "status_file": "ok",
+            "leandns_enabled": "1" if STATE["adblock_enabled"] else "0",
+            "rule_count": STATE["rule_count"] if STATE["adblock_enabled"] else None,
+            "last_update": STATE["last_update"] if STATE["adblock_enabled"] else None,
+            "engine_state": "ok" if STATE["adblock_enabled"] else "stopped",
+            "list_state": "applied" if STATE["adblock_enabled"] else "not_applied",
+            "update_result": STATE["adblock_update_result"],
         },
     }
 
@@ -131,7 +150,12 @@ def handle_api(method: str, body: dict, authed: bool):
         if method == "ping":
             if not authed:
                 return 401, {"error": "unauthorized"}
-            return 200, {"ok": True, "service": "leandns", "version": "1.0.0"}
+            return 200, {
+                "ok": True,
+                "service": "leandns",
+                "version": "1.0.0",
+                "firmware": "OpenWrt 24.10.0 (mock)",
+            }
         return 200, {"force_password_change": STATE["force_password_change"]}
 
     if method == "logout":
@@ -165,9 +189,21 @@ def handle_api(method: str, body: dict, authed: bool):
         )
         return 200, {"ok": True}
     if method == "dns_test":
-        p = status_payload()
-        p["ok"] = True
-        return 200, p
+        host = body.get("host") or STATE["dns"]["dns_test_host"]
+        if not isinstance(host, str) or not valid_domain(host):
+            return 200, {"ok": False, "error": "도메인 형식을 확인하세요."}
+        addresses = [h["ip"] for h in STATE["hosts"] if h["hostname"] == host]
+        if host in ("one.one.one.one", "example.com"):
+            addresses = ["192.0.2.1"]
+        if not STATE["dnsmasq_running"]:
+            addresses = []
+        return 200, {
+            "ok": True,
+            "dns_test_host": host,
+            "dns_test_ok": bool(addresses),
+            "dns_test_latency_ms": 0,
+            "addresses": addresses,
+        }
     if method == "dns_restart":
         return 200, {"ok": True}
     if method == "hosts_list":
@@ -178,7 +214,7 @@ def handle_api(method: str, body: dict, authed: bool):
         for h in hosts:
             hn = h.get("hostname", "")
             ip = h.get("ip", "")
-            if not valid_domain(hn) or not valid_ipv4(ip):
+            if not valid_domain(hn) or not (valid_ipv4(ip) or valid_ipv6(ip)):
                 return 200, {"ok": False, "error": "invalid host record"}
             cleaned.append({"hostname": hn, "ip": ip})
         # dedupe
@@ -193,11 +229,14 @@ def handle_api(method: str, body: dict, authed: bool):
         STATE["adblock_enabled"] = bool(body.get("enabled", True))
         return 200, {"ok": True}
     if method == "adblock_update":
-        # simulate resource check
+        if not STATE["adblock_enabled"]:
+            return 200, {"ok": False, "error": "광고 차단을 먼저 활성화하세요."}
         if body.get("force_fail"):
+            STATE["adblock_update_result"] = "low_ram"
             return 200, {"ok": False, "error": "update failed; previous list retained"}
-        STATE["last_update"] = time.strftime("%Y-%m-%dT%H:%M:%S")
+        STATE["last_update"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         STATE["rule_count"] = 85000
+        STATE["adblock_update_result"] = "success"
         return 200, {"ok": True}
     if method == "lists_get":
         return 200, {"allow": list(STATE["allow"]), "block": list(STATE["block"])}
@@ -249,30 +288,54 @@ def handle_api(method: str, body: dict, authed: bool):
     if method == "password_changed":
         STATE["force_password_change"] = False
         return 200, {"ok": True}
-    if method == "network_get":
-        return 200, dict(STATE["network"])
-    if method == "network_set":
-        ipaddr = body.get("ipaddr", "")
-        netmask = body.get("netmask", "")
-        gateway = body.get("gateway", "")
-        if not (valid_ipv4(ipaddr) and valid_ipv4(netmask) and valid_ipv4(gateway)):
-            return 200, {"ok": False, "error": "missing fields"}
-        STATE["network"] = {"ipaddr": ipaddr, "netmask": netmask, "gateway": gateway}
-        return 200, {"ok": True}
+    if method in ("network_get", "network_set", "network_confirm"):
+        pending = STATE["network_pending"]
+        if pending and time.monotonic() >= pending["deadline"]:
+            STATE["network"] = pending["previous"]
+            STATE["network_pending"] = pending = None
+        if method == "network_get":
+            return 200, {
+                **STATE["network"],
+                "pending_ip": STATE["network"]["ipaddr"] if pending else "",
+                "pending_state": "ready" if pending else "",
+            }
+        if method == "network_confirm":
+            if not pending:
+                return 200, {"ok": False, "error": "확정할 임시 설정이 없습니다."}
+            STATE["network_pending"] = None
+            return 200, {"ok": True}
+        if pending:
+            return 200, {"ok": False, "error": "다른 네트워크 변경이 진행 중입니다."}
+        network = {key: body.get(key, "") for key in ("ipaddr", "netmask", "gateway")}
+        if not all(valid_ipv4(address) for address in network.values()):
+            return 200, {"ok": False, "error": "IP 주소, 서브넷 마스크 및 게이트웨이를 확인하세요."}
+        STATE["network_pending"] = {"previous": STATE["network"], "deadline": time.monotonic() + 120}
+        STATE["network"] = network
+        return 200, {"ok": True, "pending_ip": network["ipaddr"], "timeout_s": 120}
     if method == "udp_token_get":
-        return 200, {
-            "token": STATE["udp_token"],
+        STATE["udp_set_enabled"] = True
+        result = {
             "port": 37421,
-            "required": STATE["udp_token_required"],
+            "required": bool(STATE.get("udp_token_required", True)),
+            "enabled": True,
         }
+        if body.get("reveal") is True:
+            result["token"] = STATE["udp_token"]
+        return 200, result
     if method == "udp_token_set":
-        if "required" not in body or not isinstance(body.get("required"), bool):
-            return 200, {"ok": False, "error": "missing required"}
-        STATE["udp_token_required"] = body["required"]
-        return 200, {"ok": True, "required": STATE["udp_token_required"]}
+        if "required" in body:
+            required = bool(body["required"])
+        elif isinstance(body.get("enabled"), bool):
+            # Legacy: enabled=false meant "no token", not "SET off".
+            required = bool(body["enabled"])
+        else:
+            return 200, {"ok": False, "error": "required 또는 enabled 값이 필요합니다."}
+        STATE["udp_token_required"] = required
+        STATE["udp_set_enabled"] = True
+        return 200, {"ok": True, "required": required, "enabled": True}
     if method == "udp_token_regen":
-        STATE["udp_token"] = secrets.token_hex(12)
-        return 200, {"ok": True, "token": STATE["udp_token"], "port": 37421}
+        STATE["udp_token"] = secrets.token_hex(16)
+        return 200, {"ok": True, "port": 37421}
     return 404, {"error": f"unknown method {method}"}
 
 

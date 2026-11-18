@@ -4,138 +4,267 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>LeanDNS</title>
-  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/app.css?v=17">
+  <link rel="icon" href="img/brand-icon.webp" type="image/webp">
 </head>
 <body>
   <div id="login-view" class="login-wrap hidden">
     <form id="login-form" class="login-card" autocomplete="on">
-      <h1>LeanDNS</h1>
+      <div class="login-brand">
+        <img class="login-brand-icon" src="img/brand-icon.webp" width="48" height="48" alt="" decoding="async">
+        <h1>LeanDNS</h1>
+      </div>
       <p class="muted">스마트 DNS 관리</p>
       <label>사용자명<input id="login-user" name="username" value="root" required></label>
       <label>비밀번호<input id="login-pass" name="password" type="password" required></label>
       <button type="submit">로그인</button>
       <p id="login-error" class="error" role="alert"></p>
-      <p id="force-pw" class="warn hidden">기본 비밀번호를 변경한 뒤 사용하세요. LuCI/SSH에서 root 암호를 설정합니다.</p>
+      <p id="force-pw" class="warn hidden">root 비밀번호가 없습니다. SSH로 접속해 <code>passwd</code>로 설정한 뒤 로그인하세요.</p>
     </form>
   </div>
 
   <div id="app" class="app hidden">
-    <aside class="sidebar">
-      <div class="brand">LeanDNS</div>
+    <header class="mobile-topbar">
+      <button id="menu-toggle" type="button" class="icon-btn" aria-label="메뉴 열기" aria-controls="sidebar" aria-expanded="false">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+      <div class="mobile-brand">
+        <strong>LeanDNS</strong>
+        <span id="header-version" class="mobile-version" aria-live="polite">—</span>
+      </div>
+      <button type="button" class="icon-btn theme-toggle" aria-label="테마 전환">
+        <svg class="icon icon-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 14.3A8.5 8.5 0 0 1 9.7 3 7 7 0 1 0 21 14.3z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+        <svg class="icon icon-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+    </header>
+
+    <div id="drawer-backdrop" class="drawer-backdrop" aria-hidden="true"></div>
+
+    <aside id="sidebar" class="sidebar" aria-label="주 메뉴">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">
+          <img class="brand-icon" src="img/brand-icon.webp" width="34" height="34" alt="" decoding="async">
+        </span>
+        <div class="brand-text">
+          <div class="brand-name">LeanDNS</div>
+          <p id="brand-version" class="brand-version" aria-live="polite">—</p>
+        </div>
+      </div>
       <nav>
-        <button data-page="dashboard" class="nav active">대시보드</button>
-        <button data-page="dns" class="nav">DNS 설정</button>
-        <button data-page="adblock" class="nav">광고 차단</button>
-        <button data-page="lists" class="nav">허용/차단</button>
-        <button data-page="system" class="nav">시스템</button>
-        <button data-page="help" class="nav">도움말</button>
+        <button data-page="dashboard" class="nav active" type="button">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13h7V4H4v9zm9 7h7V11h-7v9zM13 4v5h7V4h-7zM4 20h7v-5H4v5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+          <span>대시보드</span>
+        </button>
+        <button data-page="dns" class="nav" type="button">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zm0 0c2.5 2.8 2.5 14.2 0 17m0-17c-2.5 2.8-2.5 14.2 0 17M3.5 9h17M3.5 15h17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          <span>DNS 설정</span>
+        </button>
+        <button data-page="adblock" class="nav" type="button">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 5 6v5c0 5 3 8.5 7 10 4-1.5 7-5 7-10V6l-7-3z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M9.5 12.5 11 14l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span>광고 차단</span>
+        </button>
+        <button data-page="lists" class="nav" type="button">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11M5 6h.01M5 12h.01M5 18h.01" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          <span>허용/차단</span>
+        </button>
+        <button data-page="system" class="nav" type="button">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M19.4 13a7.8 7.8 0 0 0 .1-2l2-1.2-2-3.4-2.3.7a8 8 0 0 0-1.7-1L15 4h-6l-.5 2.1a8 8 0 0 0-1.7 1L4.5 6.4l-2 3.4 2 1.2a7.8 7.8 0 0 0 0 2l-2 1.2 2 3.4 2.3-.7a8 8 0 0 0 1.7 1L9 20h6l.5-2.1a8 8 0 0 0 1.7-1l2.3.7 2-3.4-2-1.2z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+          <span>시스템</span>
+        </button>
+        <button data-page="help" class="nav" type="button">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M9.6 9.2a2.5 2.5 0 1 1 3.5 2.3c-.8.4-1.1.8-1.1 1.7V14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="17" r="1" fill="currentColor"/></svg>
+          <span>도움말</span>
+        </button>
       </nav>
       <div class="sidebar-foot">
-        <button id="theme-toggle" type="button" class="ghost">테마</button>
-        <button id="logout-btn" type="button" class="ghost">로그아웃</button>
+        <button type="button" class="icon-btn theme-toggle desktop-theme" aria-label="테마 전환">
+          <svg class="icon icon-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 14.3A8.5 8.5 0 0 1 9.7 3 7 7 0 1 0 21 14.3z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+          <svg class="icon icon-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+        <button id="logout-btn" type="button" class="ghost logout-btn">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 7V5a2 2 0 0 1 2-2h7v18h-7a2 2 0 0 1-2-2v-2M15 12H3m0 0 3-3m-3 3 3 3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span>로그아웃</span>
+        </button>
       </div>
     </aside>
+
     <main class="main">
       <header class="top">
         <h2 id="page-title">대시보드</h2>
-        <div id="toast" class="toast hidden" role="status"></div>
       </header>
 
       <section id="page-dashboard" class="page">
-        <div class="cards">
-          <article class="card"><h3>DNS 서버</h3><p id="st-dns">—</p></article>
-          <article class="card"><h3>광고 차단</h3><p id="st-adblock">—</p></article>
-          <article class="card"><h3>메모리</h3><p id="st-mem">—</p></article>
-          <article class="card"><h3>CPU</h3><p id="st-cpu">—</p></article>
-          <article class="card"><h3>차단 규칙</h3><p id="st-rules">—</p></article>
-          <article class="card"><h3>DNS 응답 테스트</h3><p id="st-rtt">—</p></article>
-          <article class="card"><h3>최근 업데이트</h3><p id="st-upd">—</p></article>
-          <article class="card"><h3>가동 시간</h3><p id="st-up">—</p></article>
+        <div class="cards overview">
+          <article class="card"><h3>DNS 서버</h3><p id="st-dns">—</p><small id="st-rtt"></small></article>
+          <article class="card"><h3>광고 차단</h3><p id="st-adblock">—</p><small id="st-rules"></small></article>
         </div>
-        <p class="muted">캐시 적중률·차단 질의 수·클라이언트별 통계: <strong>지원하지 않음</strong></p>
-        <button id="btn-refresh-status" type="button">새로고침</button>
+        <div class="split">
+          <article class="panel">
+            <h3>시스템 리소스</h3>
+            <div class="resource-meters">
+              <div>
+                <div class="resource-reading"><span id="st-mem-label">RAM</span><span id="st-mem-used">—</span></div>
+                <meter id="st-mem-meter" aria-labelledby="st-mem-label" value="0" hidden></meter>
+                <small id="st-mem-available" class="resource-detail muted"></small>
+              </div>
+              <div>
+                <div class="resource-reading"><span id="st-flash-label">FLASH</span><span id="st-flash-total">—</span></div>
+                <meter id="st-flash-meter" aria-labelledby="st-flash-label" aria-describedby="st-flash-scope" value="0" hidden></meter>
+                <small id="st-flash-scope" class="resource-detail muted"></small>
+              </div>
+            </div>
+            <dl class="facts">
+              <div><dt>가동 시간</dt><dd id="st-up">—</dd></div>
+              <div><dt>펌웨어</dt><dd id="st-firmware">—</dd></div>
+            </dl>
+          </article>
+          <article class="panel panel-link" id="dns-summary-card" role="link" tabindex="0" aria-label="DNS 설정으로 이동">
+            <h3>DNS 설정 요약</h3>
+            <dl class="facts">
+              <div class="fact-nav">
+                <dt>상위 DNS</dt>
+                <dd>
+                  <span id="st-upstream">—</span>
+                  <svg class="chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </dd>
+              </div>
+              <div><dt>내부 도메인</dt><dd id="st-domain">—</dd></div>
+              <div><dt>적용 목록 갱신 시각</dt><dd id="st-upd">—</dd></div>
+            </dl>
+          </article>
+        </div>
+        <div class="row dashboard-actions">
+          <span id="st-checked" class="muted"></span>
+          <button id="btn-refresh-status" type="button" class="secondary">새로고침</button>
+        </div>
       </section>
 
-      <section id="page-dns" class="page hidden">
-        <form id="dns-form" class="form">
-          <label>상위 DNS 서버 (한 줄에 하나)<textarea id="dns-upstream" rows="4"></textarea></label>
-          <label>캐시 크기 (0–10000)<input id="dns-cache" type="number" min="0" max="10000"></label>
-          <label>내부 도메인<input id="dns-domain" type="text"></label>
-          <label>DNS 테스트 호스트<input id="dns-test-host" type="text"></label>
-          <label class="check"><input id="dns-ipv6" type="checkbox"> IPv6 DNS (AAAA 필터 해제)</label>
-          <div class="row">
-            <button type="submit">저장 및 적용</button>
-            <button id="btn-dns-test" type="button" class="secondary">DNS 테스트</button>
-            <button id="btn-dns-restart" type="button" class="secondary">DNS 재시작</button>
+      <section id="page-dns" class="page hidden stack">
+        <article class="panel">
+          <h3>상위 DNS 설정</h3>
+          <form id="dns-form" class="form">
+            <label>상위 DNS 서버 (한 줄에 하나)<textarea id="dns-upstream" rows="3" required></textarea></label>
+            <label>캐시 크기 (0–10000)<input id="dns-cache" type="number" min="0" max="10000" required></label>
+            <label class="check"><input id="dns-ipv6" type="checkbox"> IPv6 주소(AAAA) 응답 허용</label>
+            <p class="muted">AAAA 응답을 제어합니다. 상위 DNS 서버 주소는 위에서 설정합니다.</p>
+            <div class="row">
+              <button type="submit">저장 및 적용</button>
+              <button id="btn-dns-restart" type="button" class="secondary">DNS 재시작</button>
+            </div>
+          </form>
+        </article>
+        <article class="panel">
+          <h3>DNS 연결 테스트</h3>
+          <form id="dns-test-form" class="row">
+            <label class="grow">조회할 도메인<input id="dns-test-host" placeholder="one.one.one.one" required></label>
+            <button type="submit" class="secondary">조회</button>
+          </form>
+          <p class="muted">입력한 도메인을 대시보드에도 사용하려면 상위 DNS 설정의 저장 및 적용 버튼을 누르세요.</p>
+          <div id="dns-result" class="result hidden" role="status"></div>
+        </article>
+        <article class="panel">
+          <h3>내부 DNS 레코드</h3>
+          <label class="form">내부 도메인<input id="dns-domain" type="text" form="dns-form" required></label>
+          <form id="host-add" class="form inline">
+            <label>호스트<input id="host-name" placeholder="nas.home.arpa" required></label>
+            <label>IPv4 / IPv6 주소<input id="host-ip" placeholder="192.168.0.201" required></label>
+            <div class="row">
+              <button id="host-submit" type="submit" disabled>추가</button>
+              <button id="host-cancel" type="button" class="secondary hidden">취소</button>
+            </div>
+          </form>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>호스트</th><th>IP 주소</th><th>관리</th></tr></thead>
+              <tbody id="hosts-body"></tbody>
+            </table>
           </div>
-        </form>
-        <h3>내부 DNS 레코드</h3>
-        <form id="host-add" class="form inline">
-          <input id="host-name" placeholder="nas.home.arpa" required>
-          <input id="host-ip" placeholder="192.168.0.201" required>
-          <button type="submit">추가</button>
-        </form>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>호스트</th><th>IP</th><th></th></tr></thead>
-            <tbody id="hosts-body"></tbody>
-          </table>
-        </div>
+        </article>
       </section>
 
       <section id="page-adblock" class="page hidden">
-        <form id="adblock-form" class="form">
-          <label class="check"><input id="adblock-enabled" type="checkbox"> 광고 차단 활성화</label>
-          <p class="muted">기본 목록: adblock-lean Mini (<code>hagezi:pro.mini</code>)</p>
-          <p>상태: <span id="adblock-state">—</span></p>
-          <p>규칙 수: <span id="adblock-rules">—</span></p>
-          <p>마지막 업데이트: <span id="adblock-upd">—</span></p>
-          <div class="row">
-            <button type="submit">적용</button>
-            <button id="btn-adblock-update" type="button" class="secondary">목록 수동 업데이트</button>
-          </div>
-        </form>
+        <article class="panel">
+          <h3>광고 차단 상태</h3>
+          <dl class="facts">
+            <div><dt>기능 설정</dt><dd id="adblock-state">—</dd></div>
+            <div><dt>엔진 상태</dt><dd id="adblock-engine">—</dd></div>
+            <div><dt>차단 목록</dt><dd id="adblock-list-state">—</dd></div>
+            <div><dt>적용 목록의 규칙 수</dt><dd id="adblock-rules">—</dd></div>
+            <div><dt>적용 목록 갱신 시각</dt><dd id="adblock-upd">—</dd></div>
+            <div><dt>마지막 수동 업데이트 결과</dt><dd id="adblock-result">—</dd></div>
+          </dl>
+          <p class="muted">기본 목록은 adblock-lean Mini (<code>hagezi:pro.mini</code>)입니다.</p>
+          <form id="adblock-form" class="form">
+            <label class="check"><input id="adblock-enabled" type="checkbox"> 광고 차단 활성화</label>
+            <div class="row">
+              <button type="submit">적용</button>
+              <button id="btn-adblock-update" type="button" class="secondary">목록 수동 업데이트</button>
+              <button id="btn-adblock-status" type="button" class="secondary">상태 새로고침</button>
+            </div>
+          </form>
+        </article>
       </section>
 
       <section id="page-lists" class="page hidden">
-        <div class="split">
-          <div>
-            <h3>허용 도메인</h3>
-            <input id="allow-search" placeholder="검색" class="search">
-            <textarea id="allow-list" rows="12"></textarea>
+        <article class="panel">
+          <div class="tabs" role="group" aria-label="도메인 목록 선택">
+            <button type="button" class="secondary" data-list="allow" aria-pressed="true">허용 목록</button>
+            <button type="button" class="secondary" data-list="block" aria-pressed="false">차단 목록</button>
           </div>
-          <div>
-            <h3>차단 도메인</h3>
-            <input id="block-search" placeholder="검색" class="search">
-            <textarea id="block-list" rows="12"></textarea>
-          </div>
-        </div>
-        <p class="muted">한 줄에 도메인 하나. 저장 시 중복 제거·검증됩니다.</p>
-        <button id="btn-lists-save" type="button">목록 저장</button>
+          <fieldset id="lists-controls" disabled>
+            <form id="list-add" class="row">
+              <label class="grow">도메인 추가<input id="list-domain" placeholder="example.com" required></label>
+              <button type="submit">추가</button>
+            </form>
+            <details>
+              <summary>일괄 등록</summary>
+              <form id="list-bulk" class="form">
+                <label>한 줄에 도메인 하나<textarea id="list-bulk-domains" rows="5" required></textarea></label>
+                <div><button type="submit" class="secondary">일괄 추가</button></div>
+              </form>
+            </details>
+            <label>목록 검색<input id="list-search" type="search" placeholder="도메인 검색"></label>
+            <p id="list-count" class="muted" role="status"></p>
+            <ul id="list-entries" class="entries"></ul>
+            <div class="row">
+              <button id="list-prev" type="button" class="secondary">이전</button>
+              <button id="list-next" type="button" class="secondary">다음</button>
+              <button id="btn-lists-save" type="button">목록 저장</button>
+              <span id="list-dirty" class="warn hidden">저장할 변경사항이 있습니다.</span>
+            </div>
+          </fieldset>
+        </article>
       </section>
 
       <section id="page-system" class="page hidden">
-        <div class="cards">
-          <article class="card"><h3>Flash 여유</h3><p id="sys-flash">—</p></article>
-          <article class="card"><h3>메모리</h3><p id="sys-mem">—</p></article>
+        <div class="cards overview">
+          <article class="card"><h3>펌웨어</h3><p id="sys-firmware">—</p><small id="sys-pkg-version" class="muted"></small></article>
           <article class="card"><h3>네트워크</h3><p id="sys-net">LAN DNS 어플라이언스</p></article>
+          <article class="card"><h3 id="sys-flash-label">저장공간 여유</h3><p id="sys-flash">—</p></article>
+          <article class="card"><h3>가용 RAM / 전체</h3><p id="sys-mem">—</p></article>
         </div>
         <h3>LAN IP / 게이트웨이</h3>
         <form id="net-form" class="form">
           <label>관리 IP<input id="net-ip" type="text" required></label>
           <label>서브넷 마스크<input id="net-mask" type="text" required></label>
           <label>게이트웨이 (메인 공유기)<input id="net-gw" type="text" required></label>
-          <button type="submit">네트워크 저장 및 적용</button>
-          <p class="muted">적용 후 새 IP로 다시 접속하세요. 메인 공유기 대역이 바뀌면 여기 또는 UDP 툴로 변경합니다.</p>
+          <button id="net-apply" type="submit">네트워크 임시 적용</button>
+          <p class="muted">적용 후 새 주소에서 다시 로그인하고 120초 안에 확정하세요. 기한이 지나면 기존 주소로 다시 접속할 수 있습니다.</p>
         </form>
-        <h3>UDP 발견 토큰</h3>
-        <p class="muted">PC 툴 <code>leandns-tool</code>이 같은 LAN에서 이 장치를 찾아 관리 IP를 바꿀 때 사용합니다. (UDP 37421)</p>
+        <div id="net-pending" class="result hidden" role="status">
+          <p id="net-pending-text"></p>
+          <a id="net-pending-link">임시 주소 열기</a>
+          <button id="net-confirm" type="button">변경 확정</button>
+          <button id="net-check" type="button" class="secondary">상태 확인</button>
+        </div>
+        <h3>UDP 발견 및 IP 변경</h3>
+        <p class="muted">같은 LAN의 앱·PC 툴로 IP를 바꿀 수 있습니다. 토큰을 끄면 인증 없이 변경됩니다.</p>
         <label class="check">
-          <input id="udp-token-required" type="checkbox" checked> IP 변경에 토큰 필요
+          <input id="udp-token-required" type="checkbox" disabled> UDP IP 변경에 토큰 필요
         </label>
-        <p class="muted" id="udp-token-hint">켜져 있으면 <code>leandns-tool set --token</code>이 필요합니다. 끄면 같은 LAN에서 토큰 없이 IP를 바꿀 수 있습니다.</p>
-        <p id="udp-token-line">토큰: <code id="udp-token">—</code></p>
+        <p id="udp-token-line" class="hidden"><code id="udp-token"></code></p>
         <div class="row">
+          <button id="btn-udp-reveal" type="button" class="secondary">토큰 표시</button>
           <button id="btn-udp-regen" type="button" class="secondary">토큰 재발급</button>
         </div>
         <h3>로그</h3>
@@ -151,34 +280,55 @@
       </section>
 
       <section id="page-help" class="page hidden">
-        <article class="help">
-          <h3>설치</h3>
-          <p>OpenWrt <code>asus_rt-ac1200-v2</code> 이미지를 ASUS Firmware Restoration으로 기록한 뒤 <code>leandns-manager</code> 패키지를 설치합니다. 자세한 내용은 저장소 <code>docs/installation.md</code>를 참고하세요.</p>
-          <h3>메인 공유기 DNS</h3>
-          <p>메인 공유기 DHCP에서 DNS를 이 장치의 LAN IP(기본 192.168.0.250)로 지정합니다. LeanDNS는 설치 시 메인 공유기를 자동 변경하지 않습니다.</p>
-          <h3>메인 공유기 IP가 바뀌면</h3>
-          <p>웹에 접속되면 시스템 메뉴에서 관리 IP, 서브넷 마스크, 게이트웨이를 저장합니다. 웹에 접속되지 않으면 같은 스위치·공유기 LAN에 연결한 PC에서 UDP 37421 브로드캐스트 툴을 사용합니다. 실행 파일은 <code>scripts/build-udp-tool.sh</code>로 만들며 <code>dist/leandns-tool/</code>에 있습니다.</p>
-          <p>Windows 11:</p>
-          <pre class="help-cmd">leandns-tool-windows-amd64.exe discover
-
-leandns-tool-windows-amd64.exe set --token "웹에표시된토큰" --ip 192.168.34.250 --netmask 255.255.255.0 --gateway 192.168.34.1</pre>
-          <p>시스템 메뉴에서 「IP 변경에 토큰 필요」를 끈 경우, Windows 11에서는 <code>--token</code>을 빼도 됩니다.</p>
-          <pre class="help-cmd">leandns-tool-windows-amd64.exe set --ip 192.168.34.250 --gateway 192.168.34.1</pre>
-          <p>Linux:</p>
-          <pre class="help-cmd">./leandns-tool-linux-amd64 discover
-./leandns-tool-linux-amd64 set --token "웹에표시된토큰" --ip 192.168.34.250 --gateway 192.168.34.1</pre>
-          <p>토큰 확인이 꺼져 있으면 Linux에서도 <code>set --ip ... --gateway ...</code>만 실행합니다. 직렬 케이블이 없어도 같은 스위치 LAN이면 장치를 찾을 수 있습니다.</p>
-          <h3>장애 복구</h3>
-          <p>Reset 복구 모드 + ASUS 복구 도구로 factory 이미지를 다시 기록합니다. <code>docs/recovery.md</code> 참고.</p>
-          <h3>DNS 우회 / IPv6</h3>
-          <p>클라이언트가 DoH를 쓰거나 IPv6 DNS를 직접 쓰면 차단을 우회할 수 있습니다. IPv6 DNS 토글과 클라이언트 DoH 비활성화를 확인하세요.</p>
-          <h3>질의 기록</h3>
-          <p>상세 DNS 질의 기록은 기본 비활성입니다. 활성화 시 개인정보가 RAM 순환 버퍼에만 남을 수 있습니다.</p>
-        </article>
+        <div class="stack">
+          <details class="panel" open>
+            <summary>설치</summary>
+            <p>기준 대상은 ASUS RT-AC750L(OpenWrt <code>asus_rt-ac1200-v2</code>, 24.10.x)입니다. 커스텀 factory 이미지와 Windows용 ASUS Firmware Restoration 복구는 이 보드(동일 하드웨어 RT-AC1200 V2 포함)용입니다. 다른 OpenWrt 24.10.x 기기에는 <code>leandns-manager</code> 패키지를 설치해 사용할 수 있습니다.</p>
+            <ol>
+              <li>PC 이더넷을 <code>192.168.1.75/24</code>로 설정합니다.</li>
+              <li>전원 OFF → Reset 누른 채 전원 ON → LED가 느리게 점멸하면 Reset 해제합니다.</li>
+              <li>Firmware Restoration에서 factory 이미지를 업로드하고, 끝날 때까지 전원을 유지합니다.</li>
+            </ol>
+            <p>기본 LAN IP는 <code>192.168.0.250</code>, 게이트는 <code>192.168.0.1</code>, DHCP 서버는 꺼져 있습니다. OpenWrt가 이미 있으면(다른 기기 포함) <code>leandns-manager</code> 패키지만 설치하면 됩니다.</p>
+            <p>최초에는 root 비밀번호가 없어 관리 UI에 로그인할 수 없습니다. 먼저 SSH로 접속한 뒤 <code>passwd</code>로 비밀번호를 설정하세요.</p>
+            <pre class="help-cmd">ssh root@192.168.0.250
+passwd</pre>
+            <p>설정 후 브라우저에서 <code>http://192.168.0.250/</code>으로 root 계정과 방금 설정한 비밀번호로 로그인합니다.</p>
+          </details>
+          <details class="panel">
+            <summary>DNS 설정으로 광고 차단 사용</summary>
+            <p>메인 공유기 또는 사용하는 PC·모바일의 DNS를 이 장치의 LAN IP(기본 <code>192.168.0.250</code>)로 바꾸면, 그 기기의 DNS 조회가 LeanDNS를 거쳐 광고를 차단합니다. 공유기에 설정하면 연결된 기기 전반에 적용되고, 기기마다 따로 설정하면 필요한 기기만 사용할 수 있습니다. LeanDNS는 공유기·기기의 DNS를 자동으로 바꾸지 않습니다.</p>
+          </details>
+          <details class="panel">
+            <summary>장치 검색 및 관리 IP 변경</summary>
+            <p>같은 LAN에서 아래 명령으로 장치를 검색합니다. 시스템 화면에서 「UDP IP 변경에 토큰 필요」가 켜져 있으면 토큰이 필요합니다. 꺼져 있으면 토큰 없이 SET 할 수 있습니다. 적용 뒤 새 IP의 시스템 화면에서 변경을 확정하세요. Android용 LeanDNS 도구 앱으로도 동일하게 검색·설정할 수 있습니다.</p>
+            <p>Windows</p>
+            <pre class="help-cmd">leandns-tool-windows-amd64.exe discover
+leandns-tool-windows-amd64.exe set --token "YOUR_TOKEN" --ip 192.168.34.250 --netmask 255.255.255.0 --gateway 192.168.34.1</pre>
+            <button type="button" class="secondary copy-command">Windows 명령 복사</button>
+            <p>Linux</p>
+            <pre class="help-cmd">./leandns-tool-linux-amd64 discover
+./leandns-tool-linux-amd64 set --token "YOUR_TOKEN" --ip 192.168.34.250 --netmask 255.255.255.0 --gateway 192.168.34.1</pre>
+            <button type="button" class="secondary copy-command">Linux 명령 복사</button>
+          </details>
+          <details class="panel">
+            <summary>장애 복구 및 DNS 우회</summary>
+            <p>관리 IP 변경이 만료되면 기존 IP로 다시 접속하세요.</p>
+            <p>SSH가 되면 DNS 설정을 되돌릴 수 있습니다.</p>
+            <pre class="help-cmd">/usr/libexec/leandns/apply-dns.sh --rollback
+# 또는 설치 전 백업이 있으면
+cp -a /root/leandns-preinstall-backup/dhcp /etc/config/dhcp
+cp -a /root/leandns-preinstall-backup/network /etc/config/network
+uci commit && reboot</pre>
+            <p>부팅·네트워크가 안 되면 전원 OFF → Reset 누른 채 전원 ON → PC를 <code>192.168.1.75/24</code>로 설정한 뒤 ASUS Firmware Restoration으로 factory 이미지를 다시 올립니다.</p>
+            <p>인터넷만 급하면 메인 공유기 DHCP DNS를 <code>1.1.1.1</code> 등으로 바꿔 LeanDNS를 우회하세요. 클라이언트가 자체 DoH나 다른 IPv6 DNS를 쓰면 LeanDNS를 거치지 않을 수 있습니다. DNS 설정의 AAAA 응답 허용은 LeanDNS가 반환하는 응답만 제어합니다.</p>
+          </details>
+        </div>
       </section>
     </main>
   </div>
+  <div id="toast" class="toast hidden" role="status"></div>
   <script src="js/api.js"></script>
-  <script src="js/app.js"></script>
+  <script src="js/app.js?v=6"></script>
 </body>
 </html>

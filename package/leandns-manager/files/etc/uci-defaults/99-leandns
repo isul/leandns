@@ -54,12 +54,20 @@ if [ -f /etc/config/wireless ]; then
 	uci -q set wireless.default_radio1.disabled='1'
 fi
 
-# uhttpd: serve LeanDNS UI; keep listen on LAN
+# uhttpd: serve LeanDNS at / (symlinks via www-root.sh); keep listen on LAN.
+# Drop broken LuCI lua handler (full UI theme not installed).
 uci -q batch <<-EOF
 	set uhttpd.main.rfc1918_filter='1'
 	set uhttpd.main.redirect_https='0'
+	delete uhttpd.main.lua_prefix
+	delete uhttpd.main.index_page
 	add_list uhttpd.main.index_page='index.html'
 EOF
+
+[ -x /usr/libexec/leandns/www-root.sh ] && /usr/libexec/leandns/www-root.sh || true
+
+
+
 
 # Force password change flag for UI
 uci -q set leandns.main.force_password_change='1'

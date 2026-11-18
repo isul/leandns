@@ -57,25 +57,27 @@ Git Bash 또는 WSL에서 실행한다. `scp`/`ssh`가 PATH에 있어야 한다.
 
 ## adblock-lean
 
-LeanDNS 이미지/패키지에 **adblock-lean Mini**가 포함된다 (`hagezi:pro.mini`, 64MB RAM용).
-
-이미 설치된 장치에만 추가할 때 (Windows 11, 재플래시 없이):
-
-```bat
-scp -O -r firmware\adblock-fix root@192.168.0.250:/tmp/adblock-fix
-ssh root@192.168.0.250
-sh /tmp/adblock-fix/install.sh /tmp/adblock-fix
-```
+LeanDNS 이미지/패키지에 **adblock-lean Mini**가 포함된다 (`hagezi:pro.mini`, 64MB RAM용).  
+전체 패키지 설치(`install-on-device.sh`)에 함께 배포된다.
 
 웹 UI → 광고 차단 → 활성화 저장. 첫 목록 다운로드에 인터넷과 수 분이 필요할 수 있다.
 
-업스트림 갱신(개발 호스트): `./scripts/sync-adblock-lean.sh`
+업스트림 갱신(개발 호스트): `./scripts/sync-adblock-lean.sh` 후 `./scripts/package.sh`
+
+### 부분 갱신 번들 (플래시 없음)
+
+```bash
+./scripts/make-update-bundle.sh
+# Windows 11:
+scp -O -r firmware\update-bundle root@192.168.0.250:/tmp/leandns-upd
+ssh root@192.168.0.250 "sh /tmp/leandns-upd/install-on-device.sh /tmp/leandns-upd"
+```
 
 ## 관리 UI
 
-브라우저: `http://192.168.0.250/leandns/`
+브라우저: `http://192.168.0.250/` (동일 UI: `http://192.168.0.250/leandns/`)
 
-인증: OpenWrt/luci **root** 계정 (luci-base 세션). 최초 기본 암호를 반드시 변경한다.
+인증: OpenWrt **root** 계정 (luci-base 세션만 사용, LuCI 웹 UI 미포함). 최초 기본 암호를 반드시 변경한다.
 
 ## 메인 공유기 DNS (수동)
 

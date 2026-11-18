@@ -15,7 +15,7 @@ AdGuard Home과 비슷한 관리 경험을 목표로 하되, **dnsmasq + adblock
 | OS | OpenWrt 24.10.x (`ramips/mt76x8`) |
 | DNS | dnsmasq |
 | 광고 차단 | adblock-lean Mini |
-| UI | `/www/leandns` 정적 HTML/CSS/JS (한국어) |
+| UI | `/www/leandns` 정적 HTML/CSS/JS (한국어), `/`에서도 동일 UI |
 | API | `/usr/libexec/rpcd/leandns` + ACL |
 | 인증 | luci-base 세션 (전체 LuCI UI 미포함) |
 
@@ -38,10 +38,13 @@ Windows 11: WSL2 또는 Python3가 있는 환경에서 동일하게 실행.
 ## 패키지·이미지
 
 ```bash
-./scripts/package.sh          # 웹 동기화 + 파일 트리 스테이징
-./scripts/measure-size.sh     # 크기 측정 → docs/metrics.md
-./scripts/build.sh            # Image Builder (다운로드·빌드만, 플래시 없음)
+./scripts/package.sh              # 웹 동기화 + 파일 트리 스테이징
+./scripts/measure-size.sh         # 크기 측정 → docs/metrics.md
+./scripts/build.sh                # Image Builder (다운로드·빌드만, 플래시 없음)
 ./scripts/install-on-device.sh root@192.168.0.250   # SSH 파일 설치 (플래시 없음)
+./scripts/build-udp-tool.sh       # PC UDP 툴 → dist/leandns-tool/
+./scripts/build-discoverd.sh      # 장치 UDP 데몬 → package/.../usr/sbin/
+./scripts/make-update-bundle.sh   # 부분 갱신용 flat 번들 → firmware/update-bundle/
 ```
 
 ## 문서
@@ -52,20 +55,35 @@ Windows 11: WSL2 또는 Python3가 있는 환경에서 동일하게 실행.
 - [docs/recovery.md](docs/recovery.md) — 복구
 - [docs/security.md](docs/security.md) — 보안
 - [docs/metrics.md](docs/metrics.md) — 크기 측정
+- [docs/udp-tool.md](docs/udp-tool.md) — UDP 발견/IP 설정 (PC·Android)
 
 ## 디렉터리
 
 ```text
 LeanDNS/
-├── package/leandns-manager/   # OpenWrt 패키지
-├── web/                       # UI 소스
+├── cmd/                       # 소스: leandns-tool(PC), leandns-discoverd(장치)
+├── web/                       # UI 소스 (SSOT)
+├── package/leandns-manager/   # OpenWrt 패키지 (SSOT)
 ├── host/                      # 로컬 mock 서버
-├── scripts/                   # build/test/package/install
+├── android/leandns-tool/      # Android UDP 발견·IP 설정 앱
+├── scripts/                   # build / test / package / install
 ├── tests/
 ├── configs/
 ├── docs/
-└── firmware/                  # 빌드 산출물 (gitignore)
+├── third_party/adblock-lean/  # 벤더 스냅샷
+├── dist/                      # PC 툴 빌드 산출 (gitignore)
+└── firmware/                  # 이미지·스테이징·update-bundle 산출 (gitignore)
 ```
+
+## LeanDNS Tool
+
+| 구성 | 경로 |
+|------|------|
+| 장치 데몬 | `cmd/leandns-discoverd/` → `package/.../usr/sbin/leandns-discoverd` |
+| PC CLI | `cmd/leandns-tool/` → `dist/leandns-tool/` (`./scripts/build-udp-tool.sh`) |
+| Android | `android/leandns-tool/` |
+
+상세: [docs/udp-tool.md](docs/udp-tool.md)
 
 ## 기본 네트워크
 

@@ -9,7 +9,6 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-	"time"
 )
 
 const (
@@ -26,6 +25,7 @@ type netInfo struct {
 	Version       string `json:"version"`
 	Name          string `json:"name"`
 	TokenRequired bool   `json:"token_required"`
+	SetEnabled    bool   `json:"set_enabled"`
 }
 
 type setReq struct {
@@ -82,7 +82,10 @@ func handle(msg string) string {
 		if err := json.Unmarshal([]byte(parts[2]), &req); err != nil {
 			return magic + `|SET_ERR|{"error":"bad json"}`
 		}
-		if tokenRequired() {
+		if !udpSetEnabled() {
+			return magic + `|SET_ERR|{"error":"remote IP changes disabled"}`
+		}
+		if udpTokenRequired() {
 			tok, err := os.ReadFile(tokenFn)
 			if err != nil {
 				return magic + `|SET_ERR|{"error":"token not configured"}`
@@ -95,18 +98,20 @@ func handle(msg string) string {
 		if !validIPv4(req.IPAddr) || !validIPv4(req.Netmask) || !validIPv4(req.Gateway) {
 			return magic + `|SET_ERR|{"error":"missing fields"}`
 		}
-		// Reply first, then apply after short delay in background so client gets ACK
-		go func() {
-			time.Sleep(300 * time.Millisecond)
-			_ = exec.Command("/usr/libexec/leandns/apply-network.sh", req.IPAddr, req.Netmask, req.Gateway).Run()
-		}()
-		b, _ := json.Marshal(map[string]any{
-			"ok":      true,
-			"ipaddr":  req.IPAddr,
-			"netmask": req.Netmask,
-			"gateway": req.Gateway,
-		})
-		return magic + "|SET_OK|" + string(b)
+		response, err := exec.Command("/usr/libexec/leandns/apply-network.sh", req.IPAddr, req.Netmask, req.Gateway).Output()
+		if err != nil {
+			return magic + `|SET_ERR|{"error":"could not stage LAN settings"}`
+		}
+		var result struct {
+			OK bool `json:"ok"`
+		}
+		if json.Unmarshal(response, &result) != nil {
+			return magic + `|SET_ERR|{"error":"invalid LAN settings response"}`
+		}
+		if !result.OK {
+			return magic + "|SET_ERR|" + strings.TrimSpace(string(response))
+		}
+		return magic + "|SET_OK|" + strings.TrimSpace(string(response))
 	default:
 		return ""
 	}
@@ -120,7 +125,8 @@ func readNet() netInfo {
 		Version:       "1.0.0",
 		Name:          "LeanDNS",
 		MAC:           "unknown",
-		TokenRequired: tokenRequired(),
+		TokenRequired: udpTokenRequired(),
+		SetEnabled:    udpSetEnabled(),
 	}
 	ifaces, _ := net.Interfaces()
 	for _, iface := range ifaces {
@@ -135,8 +141,12 @@ func readNet() netInfo {
 	return info
 }
 
-func tokenRequired() bool {
-	return uciGet("leandns.main.udp_token_required", "1") != "0"
+func udpSetEnabled() bool {
+	return uciGet("leandns.main.udp_set_enabled", "0") == "1"
+}
+
+func udpTokenRequired() bool {
+	return uciGet("leandns.main.udp_token_required", "1") == "1"
 }
 
 func validIPv4(s string) bool {

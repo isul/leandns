@@ -10,6 +10,8 @@ ABL_INIT=/etc/init.d/adblock-lean
 ABL_CONFIG=/etc/adblock-lean/config
 ABL_MINI_TEMPLATE=/etc/adblock-lean/config.mini
 STATUS_FILE=/var/lib/leandns/adblock.status
+UPDATE_FILE=/var/lib/leandns/adblock.update
+UPDATE_LOCK=/var/lib/leandns/adblock.update.lock
 
 mkdir -p /var/lib/leandns /etc/leandns /etc/adblock-lean /tmp/dnsmasq.d
 
@@ -30,8 +32,8 @@ tmp_free_kb() {
 }
 
 check_resources() {
-	min_ram="$(uci -q get leandns.main.min_free_ram_kb)"
-	min_tmp="$(uci -q get leandns.main.min_tmp_kb)"
+	min_ram="$(uci -q get leandns.main.min_free_ram_kb || true)"
+	min_tmp="$(uci -q get leandns.main.min_tmp_kb || true)"
 	min_ram="${min_ram:-8192}"
 	min_tmp="${min_tmp:-2048}"
 	ram="$(free_ram_kb)"
@@ -161,74 +163,147 @@ sync_custom_lists() {
 }
 
 abl_available() {
-	[ -x "$ABL_INIT" ] || [ -f "$ABL_INIT" ]
+	[ -x "$ABL_INIT" ]
+}
+
+count_rules() {
+	file="$1"
+	[ -r "$file" ] || return 1
+	# BusyBox may lack `stat -c`; size + mtime is enough for a cache key.
+	size="$(wc -c < "$file" 2>/dev/null | tr -d ' \t')"
+	mtime="$(date -r "$file" +%s 2>/dev/null || echo 0)"
+	key="${size}:${mtime}"
+	[ -n "$size" ] || return 1
+	if [ -r /var/lib/leandns/adblock.count ] && read -r cached count < /var/lib/leandns/adblock.count &&
+		[ "$cached" = "$key" ] && [ -n "$count" ]; then
+		printf '%s' "$count"
+		return
+	fi
+	case "$file" in
+		*.gz) cmd="gzip -dc" ;;
+		*.zst) cmd="zstd -dc" ;;
+		*) cmd=cat ;;
+	esac
+	count="$($cmd "$file" 2>/dev/null | awk -F / '
+		/^(server|local)=\// && !/adblocklean-test123\.totallybogus/ { count += NF - 2 }
+		END { if (count) print count }
+	')"
+	if [ -n "$count" ]; then
+		mkdir -p /var/lib/leandns
+		printf '%s %s\n' "$key" "$count" > /var/lib/leandns/adblock.count
+		printf '%s' "$count"
+	fi
 }
 
 cmd_status() {
-	enabled="$(uci -q get leandns.main.enabled)"
-	abl="missing"
-	rules="unsupported"
-	last_update="unsupported"
+	enabled="$(uci -q get leandns.main.enabled || echo 0)"
+	abl=missing
+	engine=missing
+	list=not_applied
+	rules=unsupported
+	last_update=unsupported
+	status="$(cat "$STATUS_FILE" 2>/dev/null || echo unknown)"
+	update="$(cat "$UPDATE_FILE" 2>/dev/null || true)"
+	case "$update" in
+		success|low_ram|low_tmp|failed|updating) ;;
+		*) update=unknown ;;
+	esac
+
 	if abl_available; then
-		if "$ABL_INIT" enabled >/dev/null 2>&1; then
-			abl="enabled"
+		if "$ABL_INIT" enabled >/dev/null 2>&1; then abl=enabled; else abl=disabled; fi
+		engine=stopped
+		pid="$(cat /tmp/adblock-lean/adblock-lean.pid 2>/dev/null || true)"
+		case "$pid" in ''|*[!0-9]*) pid= ;; esac
+		confdir="$(uci -q get dhcp.@dnsmasq[0].confdir || echo /tmp/dnsmasq.d)"
+		if [ -d "$UPDATE_LOCK" ] || { [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; }; then
+			engine=checking
+			list=updating
 		else
-			abl="disabled"
-		fi
-		for f in /var/run/adblock-lean/abl-blocklist.gz /tmp/adblock-lean/blocklist \
-			/tmp/dnsmasq.d/abl-blocklist /tmp/dnsmasq.d/adblock-lean \
-			/var/run/adblock-lean/blocklist; do
-			if [ -f "$f" ]; then
-				case "$f" in
-					*.gz)
-						rules="$(gzip -dc "$f" 2>/dev/null | grep -c . || echo 0)"
-						;;
-					*)
-						rules="$(grep -c . "$f" 2>/dev/null || echo 0)"
-						;;
-				esac
+			[ "$enabled" != 1 ] || engine=error
+			for active in "$confdir"/abl-blocklist "$confdir"/abl-conf-script; do
+				[ -f "$active" ] || continue
+				if ! command -v nslookup >/dev/null 2>&1; then
+					engine=checking
+					list=unknown
+				elif nslookup -type=A -timeout=1 -retry=1 adblocklean-test123.totallybogus 127.0.0.1 2>/dev/null |
+					grep -qE '^Address( [0-9]+)?:[[:space:]]+0\.0\.0\.0([[:space:]]|$)'; then
+					engine=ok
+					list=applied
+					source="$active"
+					for shared in /var/run/adblock-lean/abl-blocklist.gz /var/run/adblock-lean/abl-blocklist.zst; do
+						[ -s "$shared" ] || continue
+						source="$shared"
+						break
+					done
+					last_update="$(date -u -r "$source" '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || echo unsupported)"
+					rules="$(count_rules "$source" || true)"
+					rules="${rules:-unsupported}"
+				fi
 				break
-			fi
-		done
-		if [ -f /etc/adblock-lean/config ]; then
-			last_update="$(date -r /etc/adblock-lean/config '+%Y-%m-%dT%H:%M:%S' 2>/dev/null || echo unknown)"
+			done
 		fi
-		[ -f /var/run/adblock-lean/update_time ] && last_update="$(cat /var/run/adblock-lean/update_time)"
 	fi
-	printf '{"adblock_available":%s,"adblock_state":"%s","leandns_enabled":"%s","rule_count":"%s","last_update":"%s","status_file":"%s"}\n' \
-		"$(abl_available && echo true || echo false)" \
-		"$abl" "${enabled:-0}" "$rules" "$last_update" "$(cat "$STATUS_FILE" 2>/dev/null || echo ok)"
+	# A failed wrapper may be killed before it can publish its result.
+	[ "$update" != updating ] || [ "$list" = updating ] || update=failed
+	case "$status" in updating|ok:*|error:*) ;; *) status=unknown ;; esac
+	printf '{"adblock_available":%s,"adblock_state":"%s","leandns_enabled":"%s","rule_count":"%s","last_update":"%s","status_file":"%s","engine_state":"%s","list_state":"%s","update_result":"%s"}\n' \
+		"$(abl_available && echo true || echo false)" "$abl" "$enabled" "$rules" "$last_update" "$status" "$engine" "$list" "$update"
+}
+
+start_update() {
+	action="$1"
+	mkdir "$UPDATE_LOCK" 2>/dev/null || {
+		echo '{"ok":false,"error":"목록 작업이 진행 중입니다."}'
+		return
+	}
+	if ! check_resources; then
+		if [ "$action" = update ]; then
+			sed 's/^error://' "$STATUS_FILE" > "$UPDATE_FILE"
+		fi
+		rmdir "$UPDATE_LOCK"
+		echo '{"ok":false,"error":"업데이트에 필요한 RAM 또는 임시 공간이 부족합니다."}'
+		return
+	fi
+	if [ "$action" = enable ] && ! (
+		"$ABL_INIT" enable >/dev/null 2>&1 &&
+		uci -q set leandns.main.enabled=1 &&
+		uci -q commit leandns
+	); then
+		rmdir "$UPDATE_LOCK"
+		echo '{"ok":false,"error":"광고 차단 활성화 실패"}'
+		return
+	fi
+	write_status updating
+	[ "$action" != update ] || echo updating > "$UPDATE_FILE"
+	(
+		trap 'rmdir "$UPDATE_LOCK"' EXIT
+		if (ensure_dnsmasq_confdir && ensure_mini_config && sync_custom_lists) && "$ABL_INIT" start; then
+			write_status "ok:$action"
+			[ "$action" != update ] || echo success > "$UPDATE_FILE"
+		else
+			write_status "error:${action}_failed"
+			[ "$action" != update ] || echo failed > "$UPDATE_FILE"
+			log "adblock start failed; see system logs"
+		fi
+	) </dev/null >/tmp/leandns-adblock-start.log 2>&1 &
+	echo '{"ok":true,"started":"background"}'
 }
 
 cmd_enable() {
-	ensure_dnsmasq_confdir
-	ensure_mini_config
-	sync_custom_lists
 	if ! abl_available; then
 		write_status "error:adblock_lean_missing"
 		echo '{"ok":false,"error":"adblock-lean not installed"}'
 		return 1
 	fi
-	chmod +x "$ABL_INIT" 2>/dev/null || true
-	"$ABL_INIT" enable >/dev/null 2>&1 || true
-	uci -q set leandns.main.enabled='1'
-	uci -q commit leandns
-	# First start downloads Mini list (can take minutes) — do not block rpcd/UI
-	write_status "updating"
-	(
-		if "$ABL_INIT" start >/tmp/leandns-adblock-start.log 2>&1; then
-			mkdir -p /var/run/adblock-lean
-			date '+%Y-%m-%dT%H:%M:%S' > /var/run/adblock-lean/update_time
-			write_status "ok:enabled"
-		else
-			write_status "error:start_failed"
-			log "start failed; see /tmp/leandns-adblock-start.log"
-		fi
-	) &
-	echo '{"ok":true,"started":"background","note":"list download may take a few minutes"}'
+	start_update enable
 }
 
 cmd_disable() {
+	mkdir "$UPDATE_LOCK" 2>/dev/null || {
+		echo '{"ok":false,"error":"목록 작업이 진행 중입니다."}'
+		return
+	}
+	trap 'rmdir "$UPDATE_LOCK"' EXIT
 	if abl_available; then
 		"$ABL_INIT" stop >/dev/null 2>&1 || true
 		"$ABL_INIT" disable >/dev/null 2>&1 || true
@@ -240,29 +315,11 @@ cmd_disable() {
 }
 
 cmd_update() {
-	if ! abl_available; then
-		write_status "error:adblock_lean_missing"
-		echo '{"ok":false,"error":"adblock-lean not installed"}'
-		return 1
+	if ! abl_available || [ "$(uci -q get leandns.main.enabled || echo 0)" != 1 ]; then
+		echo '{"ok":false,"error":"광고 차단을 먼저 활성화하세요."}'
+		return
 	fi
-	check_resources || {
-		echo '{"ok":false,"error":"insufficient resources"}'
-		return 1
-	}
-	ensure_dnsmasq_confdir
-	ensure_mini_config
-	sync_custom_lists
-	write_status "updating"
-	if "$ABL_INIT" start; then
-		mkdir -p /var/run/adblock-lean
-		date '+%Y-%m-%dT%H:%M:%S' > /var/run/adblock-lean/update_time
-		write_status "ok:updated"
-		echo '{"ok":true}'
-	else
-		write_status "error:update_failed"
-		echo '{"ok":false,"error":"update failed; previous list retained"}'
-		return 1
-	fi
+	start_update update
 }
 
 cmd_sync_lists() {

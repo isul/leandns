@@ -9,8 +9,10 @@ ASUS RT-AC750L(OpenWrt `asus_rt-ac1200-v2`)에서 AdGuard Home보다 가벼운 D
 ```text
 LAN Client ──DNS:53──► dnsmasq ◄── blocklist ── adblock-lean
                               │
-Admin Browser ──HTTP──► uhttpd ── /leandns/ (static UI)
+Admin Browser ──HTTP──► uhttpd ── / and /leandns/ (same static UI)
                               └── /ubus ──► rpcd ── luci session
+
+
                                               └── leandns.uc (API)
                                                     ├── UCI (dhcp, leandns, network)
                                                     ├── adblock-lean

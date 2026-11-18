@@ -1,11 +1,36 @@
-firmware/ib/
-firmware/bin/
-firmware/files/
-firmware/leandns-manager-files/
-firmware/*.bin
-firmware/*.tar.zst
+# Host / Python
 __pycache__/
 *.pyc
 .DS_Store
 *.swp
 .host-session
+
+# PC tool cross-builds (./scripts/build-udp-tool.sh)
+dist/
+
+# Firmware build / staging (./scripts/package.sh, ./scripts/build.sh)
+firmware/ib/
+firmware/bin/
+firmware/files/
+firmware/leandns-manager-files/
+firmware/update-bundle/
+firmware/*.bin
+firmware/*.tar.zst
+firmware/*.img
+firmware/*.zip
+
+# One-off local fix trees (do not commit)
+firmware/dns-fix/
+firmware/adblock-fix/
+firmware/ipk/
+
+# Android
+android/leandns-tool/.gradle/
+android/leandns-tool/.idea/
+android/leandns-tool/.kotlin/
+android/leandns-tool/local.properties
+android/leandns-tool/app/build/
+android/leandns-tool/build/
+*.apk
+*.aab
+*.iml

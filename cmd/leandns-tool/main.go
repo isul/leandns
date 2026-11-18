@@ -25,6 +25,7 @@ type discoverInfo struct {
 	Gateway       string `json:"gateway"`
 	MAC           string `json:"mac"`
 	TokenRequired *bool  `json:"token_required"`
+	SetEnabled    *bool  `json:"set_enabled"`
 }
 
 type setBody struct {
@@ -81,8 +82,8 @@ Usage:
   leandns-tool set [--token TOKEN] --ip IP --gateway GW [--netmask 255.255.255.0]
 
 Device daemon listens on UDP/%d (%s).
-SET needs --token only when the device setting "IP 변경에 토큰 필요" is on.
-When that setting is off, omit --token.
+SET needs --token only when the device setting "UDP IP 변경에 토큰 필요" is on.
+When that setting is off, omit --token (UDP SET itself stays allowed).
 `, port, magic)
 }
 
@@ -112,6 +113,16 @@ func cmdDiscover(wait time.Duration) error {
 			fmt.Printf("mac:      %s\n", info.MAC)
 			fmt.Printf("version:  %s\n", info.Version)
 			switch {
+			case info.SetEnabled == nil:
+				fmt.Printf("set:      unknown\n")
+			case *info.SetEnabled:
+				fmt.Printf("set:      enabled\n")
+			default:
+				fmt.Printf("set:      disabled\n")
+			}
+			switch {
+			case info.SetEnabled != nil && !*info.SetEnabled:
+				fmt.Printf("token:    n/a (UDP IP change off)\n")
 			case info.TokenRequired == nil:
 				fmt.Printf("token:    unknown (assume required)\n")
 			case *info.TokenRequired:

@@ -3,15 +3,52 @@
 
 set -eu
 
-QUICK=0
-[ "${1:-}" = "--quick" ] && QUICK=1
-
-json_escape() {
-	printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
+mode="${1:-}"
+dns_probe() {
+	dns_host="${1:-$(uci -q get leandns.main.dns_test_host 2>/dev/null || true)}"
+	dns_host="${dns_host:-one.one.one.one}"
+	case "$dns_host" in
+		*[!A-Za-z0-9.-]*) dns_host= ;;
+	esac
+	if ! /usr/bin/leandns-validate domain "$dns_host"; then
+		echo '{"ok":false,"error":"도메인 형식을 확인하세요."}'
+		return
+	fi
+	dns_ok=unsupported
+	dns_lat=null
+	addresses=
+	if command -v nslookup >/dev/null 2>&1; then
+		read -r before _ < /proc/uptime
+		dns_ok=false
+		answer="$(nslookup -timeout=2 -retry=1 "$dns_host" 127.0.0.1 2>/dev/null)" && dns_ok=true
+		read -r after _ < /proc/uptime
+		if [ "$dns_ok" = true ]; then
+			addresses="$(printf '%s\n' "$answer" | awk '
+				/^Name:/ { response=1 }
+				response && /^Address( [0-9]+)?:/ {
+					if ($1 == "Address:") ip=$2
+					else ip=$3
+					if (ip ~ /^[0-9a-fA-F:.]+$/ && ip ~ /[.:]/ && !seen[ip]++) {
+						printf "%s\"%s\"", sep, ip
+						sep=","
+					}
+				}')"
+			[ -n "$addresses" ] || dns_ok=false
+		fi
+		dns_lat=$(( (${after%.*} - ${before%.*}) * 1000 + (1${after#*.} - 1${before#*.}) * 10 ))
+	fi
+	printf '{"ok":true,"dns_test_ok":"%s","dns_test_latency_ms":%s,"dns_test_resolution_ms":10,"dns_test_host":"%s","addresses":[%s]}\n' \
+		"$dns_ok" "$dns_lat" "$dns_host" "$addresses"
 }
 
-mem_total="$(awk '/^MemTotal:/ {print $2}' /proc/meminfo 2>/dev/null || echo 0)"
-mem_avail="$(awk '/^MemAvailable:/ {print $2}' /proc/meminfo 2>/dev/null || echo 0)"
+if [ "$mode" = "--dns-test" ]; then
+	dns_probe "${2:-}"
+	exit
+fi
+
+read -r mem_total mem_avail <<EOF
+$(awk '/^MemTotal:/ {total=$2} /^MemAvailable:/ {avail=$2} END {print total+0, avail=="" ? "null" : avail}' /proc/meminfo)
+EOF
 
 cpu_usage() {
 	read -r _ u1 n1 s1 i1 _ < /proc/stat
@@ -30,21 +67,23 @@ cpu_usage() {
 	echo $((busy * 100 / total))
 }
 
-if [ "$QUICK" = "1" ]; then
+if [ "$mode" = "--quick" ] || [ "$mode" = "--system" ]; then
 	cpu="unsupported"
 else
 	cpu="$(cpu_usage)"
 fi
 
-if mount 2>/dev/null | grep -q 'on /overlay'; then
+if grep -q ' /overlay ' /proc/mounts; then
+	flash_scope=overlay
 	flash_total="$(df -k /overlay 2>/dev/null | awk 'NR==2 {print $2}')"
 	flash_free="$(df -k /overlay 2>/dev/null | awk 'NR==2 {print $4}')"
 else
+	flash_scope=root
 	flash_total="$(df -k / 2>/dev/null | awk 'NR==2 {print $2}')"
 	flash_free="$(df -k / 2>/dev/null | awk 'NR==2 {print $4}')"
 fi
-flash_total="${flash_total:-0}"
-flash_free="${flash_free:-0}"
+flash_total="${flash_total:-null}"
+flash_free="${flash_free:-null}"
 
 if pidof dnsmasq >/dev/null 2>&1; then
 	dnsmasq_running=true
@@ -52,39 +91,54 @@ else
 	dnsmasq_running=false
 fi
 
-dns_host="$(uci -q get leandns.main.dns_test_host 2>/dev/null || true)"
-dns_host="${dns_host:-one.one.one.one}"
-dns_ok="unsupported"
-dns_lat="unsupported"
-if command -v nslookup >/dev/null 2>&1; then
-	t0="$(date +%s 2>/dev/null || echo 0)"
-	if nslookup "$dns_host" 127.0.0.1 >/dev/null 2>&1; then
-		dns_ok=true
-	else
-		dns_ok=false
-	fi
-	t1="$(date +%s 2>/dev/null || echo 0)"
-	dns_lat=$(( (t1 - t0) * 1000 ))
-fi
-
 uptime_sec="$(awk '{print int($1)}' /proc/uptime)"
 cachesize="$(uci -q get leandns.main.cachesize 2>/dev/null || echo 0)"
-abl_json="$(/usr/libexec/leandns/adblock-ctl.sh status 2>/dev/null || echo '{}')"
+
+json_escape() {
+	printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
+}
+
+leandns_version="$(tr -d '\r\n' < /etc/leandns/version 2>/dev/null || true)"
+leandns_version="${leandns_version:-1.0.0}"
+firmware=
+if [ -r /etc/openwrt_release ]; then
+	# shellcheck disable=SC1091
+	. /etc/openwrt_release
+	firmware="${DISTRIB_DESCRIPTION:-${DISTRIB_RELEASE:-}}"
+fi
+[ -n "$firmware" ] || firmware=unsupported
 
 printf '{'
 printf '"dnsmasq_running":%s,' "$dnsmasq_running"
 printf '"uptime_sec":%s,' "$uptime_sec"
 printf '"mem_total_kb":%s,' "$mem_total"
 printf '"mem_available_kb":%s,' "$mem_avail"
-printf '"cpu_percent":"%s",' "$(json_escape "$cpu")"
+printf '"cpu_percent":"%s",' "$cpu"
+printf '"flash_scope":"%s",' "$flash_scope"
 printf '"flash_total_kb":%s,' "$flash_total"
 printf '"flash_free_kb":%s,' "$flash_free"
 printf '"cachesize":%s,' "${cachesize:-0}"
+printf '"version":"%s",' "$(json_escape "$leandns_version")"
+printf '"firmware":"%s",' "$(json_escape "$firmware")"
 printf '"cache_hit_rate":"unsupported",'
 printf '"blocked_query_count":"unsupported",'
 printf '"per_client_stats":"unsupported",'
-printf '"dns_test_ok":"%s",' "$(json_escape "$dns_ok")"
-printf '"dns_test_latency_ms":"%s",' "$(json_escape "$dns_lat")"
-printf '"dns_test_host":"%s",' "$(json_escape "$dns_host")"
-printf '"adblock":%s' "$abl_json"
+printf '"adblock":'
+if [ "$mode" = "--system" ]; then
+	printf '{}'
+else
+	/usr/libexec/leandns/adblock-ctl.sh status 2>/dev/null || printf '{}'
+	upstream="$(/usr/libexec/leandns/upstream-list.sh get-json)"
+	internal_domain="$(uci -q get leandns.main.internal_domain || true)"
+	internal_domain="${internal_domain:-home.arpa}"
+	printf ',"upstream":[%s],"internal_domain":"%s"' "$upstream" "$internal_domain"
+	probe="$(dns_probe)"
+	case "$probe" in
+		'{"ok":true,'*)
+			probe="${probe#*,}"
+			printf ',%s' "${probe%\}}"
+			;;
+		*) printf ',"dns_test_ok":"unsupported"' ;;
+	esac
+fi
 printf '}\n'

@@ -11,8 +11,17 @@
   };
 
   let hostsCache = [];
-  let allowAll = [];
-  let blockAll = [];
+  let editingHost = null;
+  let hostsSaving = false;
+  let lists = null;
+  let currentList = 'allow';
+  let listPage = 0;
+  let listsDirty = false;
+  let currentPage;
+  let statusTimer;
+  let statusRequest;
+  let statusFailures = 0;
+  const pageSize = 50;
 
   function showToast(msg, ok) {
     const t = $('#toast');
@@ -66,6 +75,20 @@
   function setTheme(theme) {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('leandns_theme', theme);
+    $$('.theme-toggle').forEach((btn) => {
+      btn.setAttribute('aria-label', theme === 'dark' ? '라이트 테마' : '다크 테마');
+    });
+  }
+
+  function setDrawer(open) {
+    document.body.classList.toggle('drawer-open', open);
+    const toggle = $('#menu-toggle');
+    const backdrop = $('#drawer-backdrop');
+    if (toggle) {
+      toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      toggle.setAttribute('aria-label', open ? '메뉴 닫기' : '메뉴 열기');
+    }
+    if (backdrop) backdrop.setAttribute('aria-hidden', open ? 'false' : 'true');
   }
 
   function showPage(name) {
@@ -74,44 +97,166 @@
     if (el) el.classList.remove('hidden');
     $$('.nav').forEach((b) => b.classList.toggle('active', b.dataset.page === name));
     $('#page-title').textContent = titles[name] || name;
-    if (name === 'dashboard') refreshStatus();
+    currentPage = name;
+    setDrawer(false);
+    hideToken();
+    scheduleStatus(true);
+    if (name === 'lists') renderLists();
     if (name === 'dns') loadDns();
     if (name === 'adblock') loadAdblock();
-    if (name === 'lists') loadLists();
+    if (name === 'lists' && !listsDirty) loadLists();
     if (name === 'system') loadSystem();
   }
 
+  function metric(id, value, state = '') {
+    const el = $(id);
+    el.textContent = value;
+    el.dataset.state = state;
+  }
+
+  function fmtDate(value) {
+    if (!value || value === 'unsupported') return '—';
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(value)) {
+      return value.replace('T', ' ');
+    }
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '—';
+    const pad = (n) => String(n).padStart(2, '0');
+    return [
+      [date.getFullYear(), pad(date.getMonth() + 1), pad(date.getDate())].join('-'),
+      [pad(date.getHours()), pad(date.getMinutes()), pad(date.getSeconds())].join(':')
+    ].join(' ');
+  }
+
+  function fmtLatency(s) {
+    const value = Number(s.dns_test_latency_ms);
+    if (!Number.isFinite(value) || s.dns_test_latency_ms == null) return '';
+    const precision = Number(s.dns_test_resolution_ms) || 1;
+    if (value === 0) return precision + ' ms 미만';
+    return (precision > 1 ? '약 ' : '') + value + ' ms';
+  }
+
+  function dnsSucceeded(s) {
+    return s.dns_test_ok === true || s.dns_test_ok === 'true';
+  }
+
+  function flashScope(s) {
+    return s.flash_scope === 'overlay' ? '쓰기 가능 영역 (/overlay)' : '루트 파일시스템 (/)';
+  }
+
+  function enabledAdblock(a) {
+    return a.leandns_enabled == null ? a.adblock_state === 'enabled' : String(a.leandns_enabled) === '1';
+  }
+
+  function countRules(a) {
+    const count = Number(a.rule_count);
+    return a.rule_count != null && Number.isFinite(count) ? count.toLocaleString('ko-KR') : '—';
+  }
+
+  function updateResourceMeter(meterId, readingId, amount, total) {
+    const meter = $(meterId);
+    const valid = Number.isFinite(amount) && Number.isFinite(total) && total > 0 && amount >= 0 && amount <= total;
+    meter.hidden = !valid;
+    if (!valid) {
+      metric(readingId, '—');
+      return;
+    }
+    const reading = fmtBytesKb(amount) + ' / ' + fmtBytesKb(total);
+    metric(readingId, reading);
+    meter.value = amount / total;
+    meter.setAttribute('aria-valuetext', reading);
+  }
+
+  function updateDashboard(s) {
+    const a = s.adblock || {};
+    const dns = !s.dnsmasq_running ? ['중지됨', 'error'] : dnsSucceeded(s)
+      ? ['정상', 'ok'] : s.dns_test_ok === 'unsupported' ? ['실행 중', ''] : ['조회 실패', 'warn'];
+    metric('#st-dns', ...dns);
+    metric('#st-rtt', [s.dns_test_host, dnsSucceeded(s) && fmtLatency(s)].filter(Boolean).join(' · '));
+    const adblock = a.list_state === 'updating' ? ['업데이트 중', 'warn']
+      : a.list_state === 'applied' ? ['적용됨', 'ok']
+      : !a.adblock_available ? ['미설치', 'warn']
+      : enabledAdblock(a) ? ['적용 확인 필요', 'warn'] : ['비활성', ''];
+    metric('#st-adblock', ...adblock);
+    metric('#st-rules', a.list_state === 'applied' && countRules(a) !== '—' ? countRules(a) + '개 규칙' : '');
+    const hasAvailableRam = Number.isFinite(s.mem_available_kb) && s.mem_available_kb >= 0;
+    const used = hasAvailableRam ? s.mem_total_kb - s.mem_available_kb : null;
+    updateResourceMeter('#st-mem-meter', '#st-mem-used', used, s.mem_total_kb);
+    metric('#st-mem-available', hasAvailableRam ? '가용 RAM ' + fmtBytesKb(s.mem_available_kb) : '');
+    metric('#st-flash-label', 'FLASH');
+    updateResourceMeter('#st-flash-meter', '#st-flash-total', s.flash_free_kb, s.flash_total_kb);
+    metric('#st-flash-scope', flashScope(s));
+    metric('#st-up', fmtUptime(s.uptime_sec));
+    setVersionLabels(s);
+    metric('#st-upstream', (s.upstream || []).join(', ') || '—');
+    metric('#st-domain', s.internal_domain || '—');
+    metric('#st-upd', fmtDate(a.last_update));
+    metric('#st-checked', '최근 확인 ' + fmtDate(new Date()));
+  }
+
+  function versionText(s) {
+    const fw = s && s.firmware;
+    if (fw && fw !== 'unsupported') return fw;
+    return '—';
+  }
+
+  function setVersionLabels(s) {
+    const fw = versionText(s);
+    const pkg = (s && s.version) ? String(s.version) : '';
+    const label = pkg ? fw + ' · LeanDNS ' + pkg : fw;
+    metric('#st-firmware', fw);
+    const brand = $('#brand-version');
+    if (brand) brand.textContent = label;
+    const header = $('#header-version');
+    if (header) header.textContent = label;
+    const sysFw = $('#sys-firmware');
+    if (sysFw) sysFw.textContent = fw;
+    const sysPkg = $('#sys-pkg-version');
+    if (sysPkg) sysPkg.textContent = pkg ? 'LeanDNS ' + pkg : '';
+  }
+
+  function dashboardVisible() {
+    return currentPage === 'dashboard' && !document.hidden;
+  }
+
+  function scheduleStatus(immediate = false) {
+    clearTimeout(statusTimer);
+    if (!dashboardVisible() || statusRequest) return;
+    if (immediate) refreshStatus();
+    else if (statusFailures < 3) statusTimer = setTimeout(refreshStatus, 20000);
+  }
+
   async function refreshStatus() {
+    if (!dashboardVisible() || statusRequest) return;
+    clearTimeout(statusTimer);
+    $('#btn-refresh-status').disabled = true;
+    statusRequest = LeanAPI.call('status');
     try {
-      const s = await LeanAPI.call('status');
-      $('#st-dns').textContent = s.dnsmasq_running ? '실행 중' : '중지됨';
-      const ab = s.adblock || {};
-      $('#st-adblock').textContent = ab.adblock_state || '—';
-      $('#st-mem').textContent = fmtBytesKb(s.mem_available_kb) + ' / ' + fmtBytesKb(s.mem_total_kb);
-      $('#st-cpu').textContent = s.cpu_percent === 'unsupported' ? '지원하지 않음' : (s.cpu_percent + '%');
-      $('#st-rules').textContent = ab.rule_count === 'unsupported' ? '지원하지 않음' : (ab.rule_count || '—');
-      const rtt = s.dns_test_latency_ms;
-      $('#st-rtt').textContent = (s.dns_test_ok === 'true' || s.dns_test_ok === true)
-        ? ((rtt === 'unsupported' ? '성공' : rtt + ' ms') + ' (' + (s.dns_test_host || '') + ')')
-        : (s.dns_test_ok === 'unsupported' ? '지원하지 않음' : '실패');
-      $('#st-upd').textContent = ab.last_update || '—';
-      $('#st-up').textContent = fmtUptime(s.uptime_sec);
+      updateDashboard(await statusRequest);
+      statusFailures = 0;
     } catch (e) {
-      showToast('상태 조회 실패: ' + e.message, false);
+      statusFailures++;
+      metric('#st-checked', '상태 조회 실패 · ' + e.message, 'error');
+    } finally {
+      statusRequest = null;
+      $('#btn-refresh-status').disabled = false;
+      scheduleStatus();
     }
   }
 
   async function loadDns() {
+    $('#host-submit').disabled = true;
     try {
       const d = await LeanAPI.call('dns_get');
       $('#dns-upstream').value = (d.upstream || []).join('\n');
-      $('#dns-cache').value = d.cachesize || 1000;
+      $('#dns-cache').value = d.cachesize ?? 1000;
       $('#dns-domain').value = d.internal_domain || 'home.arpa';
       $('#dns-test-host').value = d.dns_test_host || 'one.one.one.one';
       $('#dns-ipv6').checked = !!d.ipv6_dns;
       const h = await LeanAPI.call('hosts_list');
       hostsCache = h.hosts || [];
       renderHosts();
+      $('#host-submit').disabled = false;
     } catch (e) {
       showToast('DNS 설정 로드 실패: ' + e.message, false);
     }
@@ -120,97 +265,225 @@
   function renderHosts() {
     const body = $('#hosts-body');
     body.innerHTML = '';
+    if (!hostsCache.length) {
+      const row = body.insertRow().insertCell();
+      row.colSpan = 3;
+      row.textContent = '등록된 내부 DNS 레코드가 없습니다.';
+    }
     hostsCache.forEach((row, idx) => {
       const tr = document.createElement('tr');
       tr.innerHTML = '<td></td><td></td><td></td>';
       tr.children[0].textContent = row.hostname;
       tr.children[1].textContent = row.ip;
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'secondary';
-      btn.textContent = '삭제';
-      btn.addEventListener('click', (ev) => {
-        runBusy(ev, async () => {
-          hostsCache.splice(idx, 1);
-          await saveHosts();
-        });
+      const actions = tr.children[2];
+      const controls = document.createElement('div');
+      controls.className = 'row';
+      const edit = document.createElement('button');
+      edit.type = 'button';
+      edit.className = 'secondary';
+      edit.textContent = '수정';
+      edit.addEventListener('click', () => {
+        editingHost = row.hostname;
+        $('#host-name').value = row.hostname;
+        $('#host-ip').value = row.ip;
+        $('#host-submit').textContent = '저장';
+        $('#host-cancel').classList.remove('hidden');
+        $('#host-name').focus();
       });
-      tr.children[2].appendChild(btn);
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'secondary';
+      remove.textContent = '삭제';
+      remove.addEventListener('click', (ev) => {
+        runBusy(ev, () => saveHosts(hostsCache.filter((_, i) => i !== idx)));
+      });
+      controls.append(edit, remove);
+      actions.appendChild(controls);
       body.appendChild(tr);
     });
   }
 
-  async function saveHosts() {
+  function resetHostForm() {
+    editingHost = null;
+    $('#host-add').reset();
+    $('#host-submit').textContent = '추가';
+    $('#host-cancel').classList.add('hidden');
+  }
+
+  async function saveHosts(hosts) {
+    if (hostsSaving) return;
+    hostsSaving = true;
     try {
-      const r = await LeanAPI.call('hosts_set', { hosts: hostsCache });
-      if (r.ok === false) throw new Error(r.error || '실패');
-      showToast('내부 DNS 저장됨', true);
+      const r = await LeanAPI.call('hosts_set', { hosts });
+      if (r.ok === false) throw new Error(r.error || '저장 실패');
+      hostsCache = hosts;
+      resetHostForm();
       renderHosts();
-    } catch (e) {
-      showToast(e.message, false);
-      loadDns();
+      showToast('내부 DNS 저장됨', true);
+    } finally {
+      hostsSaving = false;
     }
   }
 
   async function loadAdblock() {
     try {
       const a = await LeanAPI.call('adblock_status');
-      $('#adblock-enabled').checked = a.adblock_state === 'enabled';
-      $('#adblock-state').textContent = a.adblock_available === false ? 'adblock-lean 미설치' : (a.adblock_state || '—');
-      $('#adblock-rules').textContent = a.rule_count === 'unsupported' ? '지원하지 않음' : (a.rule_count || '—');
-      $('#adblock-upd').textContent = a.last_update || '—';
+      const enabled = enabledAdblock(a);
+      $('#adblock-enabled').checked = enabled;
+      metric('#adblock-state', enabled ? '활성' : '비활성');
+      metric('#adblock-engine', ({
+        ok: '정상', error: '오류', missing: '미설치', stopped: '중지됨', checking: '확인 대기'
+      })[a.engine_state] || '확인 필요', a.engine_state === 'error' ? 'error' : '');
+      metric('#adblock-list-state', ({
+        applied: '적용됨', not_applied: '미적용', updating: '업데이트 중', unknown: '확인 필요'
+      })[a.list_state] || '확인 필요', a.list_state === 'applied' ? 'ok' : 'warn');
+      metric('#adblock-rules', countRules(a));
+      metric('#adblock-upd', fmtDate(a.last_update));
+      const messages = {
+        success: '성공', updating: '진행 중', low_ram: '실패 · 가용 RAM 부족',
+        low_tmp: '실패 · 임시 공간 부족', failed: '실패 · 시스템 로그 확인'
+      };
+      metric('#adblock-result', messages[a.update_result] || '기록 없음');
+      $('#btn-adblock-update').disabled = !enabled || a.list_state === 'updating';
+      $('#adblock-form [type="submit"]').disabled = a.list_state === 'updating';
     } catch (e) {
       showToast(e.message, false);
     }
-  }
-
-  function filterLines(text, q) {
-    if (!q) return text;
-    return text.split('\n').filter((l) => l.toLowerCase().includes(q.toLowerCase())).join('\n');
   }
 
   async function loadLists() {
+    const controls = $('#lists-controls');
+    controls.disabled = true;
     try {
-      const l = await LeanAPI.call('lists_get');
-      allowAll = l.allow || [];
-      blockAll = l.block || [];
-      $('#allow-list').value = allowAll.join('\n');
-      $('#block-list').value = blockAll.join('\n');
+      const data = await LeanAPI.call('lists_get');
+      lists = { allow: data.allow || [], block: data.block || [] };
+      controls.disabled = false;
+      renderLists();
     } catch (e) {
       showToast(e.message, false);
     }
   }
 
-  function showUdpToken(t) {
-    const required = t.required !== false;
-    $('#udp-token').textContent = t.token || '—';
-    const box = $('#udp-token-required');
-    if (box) box.checked = required;
-    const hint = $('#udp-token-hint');
-    const line = $('#udp-token-line');
-    if (hint) {
-      hint.textContent = required
-        ? '켜져 있습니다. leandns-tool set 에 --token 이 필요합니다.'
-        : '꺼져 있습니다. 같은 LAN에서 leandns-tool set 으로 토큰 없이 IP를 바꿀 수 있습니다.';
-      hint.classList.toggle('warn', !required);
+  function renderLists() {
+    const entries = $('#list-entries');
+    entries.replaceChildren();
+    if (!lists) return;
+    const all = lists[currentList];
+    const query = $('#list-search').value.trim().toLowerCase();
+    const matches = query ? all.filter((domain) => domain.toLowerCase().includes(query)) : all;
+    const pages = Math.max(1, Math.ceil(matches.length / pageSize));
+    listPage = Math.min(listPage, pages - 1);
+    const start = listPage * pageSize;
+    const range = pages > 1 ? ' · ' + (start + 1) + '–' + Math.min(start + pageSize, matches.length) : '';
+    $('#list-count').textContent = (query ? '검색 결과 ' + matches.length + ' / ' : '전체 ') + all.length + '개' + range;
+    $('#list-prev').disabled = listPage === 0;
+    $('#list-next').disabled = listPage >= pages - 1;
+    $('#btn-lists-save').disabled = !listsDirty;
+    $('#list-dirty').classList.toggle('hidden', !listsDirty);
+    if (!matches.length) {
+      const item = document.createElement('li');
+      item.textContent = query ? '검색 결과가 없습니다.' : '등록된 도메인이 없습니다.';
+      entries.appendChild(item);
     }
-    if (line) line.classList.toggle('muted', !required);
+    for (const domain of matches.slice(start, start + pageSize)) {
+      const item = document.createElement('li');
+      const label = document.createElement('span');
+      label.textContent = domain;
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'secondary';
+      remove.textContent = '삭제';
+      remove.setAttribute('aria-label', domain + ' 삭제');
+      remove.addEventListener('click', () => {
+        lists[currentList] = lists[currentList].filter((d) => d !== domain);
+        listsDirty = true;
+        renderLists();
+      });
+      item.append(label, remove);
+      entries.appendChild(item);
+    }
+  }
+
+  function addDomains(domains) {
+    const normalized = new Set(lists[currentList].map((d) => d.toLowerCase().replace(/\.$/, '')));
+    const additions = [];
+    const valid = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$/;
+    for (const raw of domains) {
+      const domain = raw.toLowerCase().replace(/\.$/, '');
+      if (!domain) continue;
+      if (domain.length > 253 || !valid.test(domain)) throw new Error('도메인 형식 확인: ' + raw);
+      if (!normalized.has(domain)) additions.push(domain);
+      normalized.add(domain);
+    }
+    if (!additions.length) {
+      showToast('추가할 새 도메인이 없습니다.', false);
+      return;
+    }
+    lists[currentList] = lists[currentList].concat(additions).sort();
+    listsDirty = true;
+    $('#list-search').value = '';
+    listPage = 0;
+    renderLists();
+    showToast(additions.length + '개 추가됨. 목록 저장을 눌러 적용하세요.', true);
+  }
+
+  function hideToken() {
+    $('#udp-token').textContent = '';
+    $('#udp-token-line').classList.add('hidden');
+    $('#btn-udp-reveal').textContent = '토큰 표시';
+  }
+
+  function revealToken(token) {
+    $('#udp-token').textContent = token;
+    $('#udp-token-line').classList.remove('hidden');
+    $('#btn-udp-reveal').textContent = '토큰 숨기기';
+  }
+
+  function updateNetwork(s) {
+    $('#net-ip').value = s.ipaddr || '';
+    $('#net-mask').value = s.netmask || '';
+    $('#net-gw').value = s.gateway || '';
+    $('#sys-net').textContent = (s.ipaddr || '—') + ' · GW ' + (s.gateway || '—');
+    const pending = s.pending_ip || '';
+    $('#net-apply').disabled = !!pending;
+    $('#net-pending').classList.toggle('hidden', !pending);
+    if (!pending) return;
+    const isNewAddress = LeanAPI.state.mode === 'mock' || location.hostname === pending;
+    const ready = s.pending_state === 'ready';
+    $('#net-confirm').classList.toggle('hidden', !isNewAddress || !ready);
+    const status = {
+      applying: '적용 준비 중입니다.',
+      ready: '120초 안에 새 주소에서 로그인한 뒤 변경을 확정하세요.',
+      restore_failed: '자동 복구에 실패했습니다. 시스템 로그를 확인하세요.'
+    };
+    metric('#net-pending-text', pending + ' · ' + (status[s.pending_state] || status.applying),
+      s.pending_state === 'restore_failed' ? 'error' : '');
+    const link = $('#net-pending-link');
+    const url = new URL(location.href);
+    url.hostname = pending;
+    url.hash = 'system';
+    link.href = url.href;
+    link.classList.toggle('hidden', isNewAddress);
+  }
+
+  async function loadLogs() {
+    const logs = await LeanAPI.call('logs_get', { lines: 100 });
+    $('#sys-logs').textContent = (logs.lines || []).join('\n') || '(로그 없음)';
   }
 
   async function loadSystem() {
     try {
-      const s = await LeanAPI.call('system_info');
+      const [s, n, t] = await Promise.all([
+        LeanAPI.call('system_info'), LeanAPI.call('network_get'), LeanAPI.call('udp_token_get')
+      ]);
+      setVersionLabels(s);
+      $('#sys-flash-label').textContent = flashScope(s) + ' 여유';
       $('#sys-flash').textContent = fmtBytesKb(s.flash_free_kb) + ' / ' + fmtBytesKb(s.flash_total_kb);
       $('#sys-mem').textContent = fmtBytesKb(s.mem_available_kb) + ' / ' + fmtBytesKb(s.mem_total_kb);
-      const n = await LeanAPI.call('network_get');
-      $('#net-ip').value = n.ipaddr || '';
-      $('#net-mask').value = n.netmask || '';
-      $('#net-gw').value = n.gateway || '';
-      $('#sys-net').textContent = (n.ipaddr || '—') + ' → GW ' + (n.gateway || '—');
-      const t = await LeanAPI.call('udp_token_get');
-      showUdpToken(t);
-      const logs = await LeanAPI.call('logs_get', { lines: 100 });
-      $('#sys-logs').textContent = (logs.lines || []).join('\n') || '(로그 없음)';
+      updateNetwork(n);
+      $('#udp-token-required').checked = t.required !== false;
+      $('#udp-token-required').disabled = false;
+      await loadLogs();
     } catch (e) {
       showToast(e.message, false);
     }
@@ -221,19 +494,45 @@
     setTheme(theme);
 
     $$('.nav').forEach((b) => b.addEventListener('click', () => showPage(b.dataset.page)));
-    $('#theme-toggle').addEventListener('click', () => {
-      const cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-      setTheme(cur);
+    $$('.theme-toggle').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+        setTheme(cur);
+      });
     });
+    const menuToggle = $('#menu-toggle');
+    if (menuToggle) {
+      menuToggle.addEventListener('click', () => {
+        setDrawer(!document.body.classList.contains('drawer-open'));
+      });
+    }
+    const backdrop = $('#drawer-backdrop');
+    if (backdrop) backdrop.addEventListener('click', () => setDrawer(false));
+    document.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Escape') setDrawer(false);
+    });
+    window.addEventListener('resize', () => {
+      if (window.matchMedia('(min-width: 861px)').matches) setDrawer(false);
+    });
+    const dnsSummary = $('#dns-summary-card');
+    if (dnsSummary) {
+      const openDns = () => showPage('dns');
+      dnsSummary.addEventListener('click', openDns);
+      dnsSummary.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Enter' || ev.key === ' ') {
+          ev.preventDefault();
+          openDns();
+        }
+      });
+    }
     $('#logout-btn').addEventListener('click', (ev) => {
       runBusy(ev, async () => {
         await LeanAPI.logout();
         location.reload();
       });
     });
-    $('#btn-refresh-status').addEventListener('click', (ev) => {
-      runBusy(ev, refreshStatus);
-    });
+    $('#btn-refresh-status').addEventListener('click', refreshStatus);
+    document.addEventListener('visibilitychange', () => scheduleStatus(true));
 
     $('#dns-form').addEventListener('submit', (ev) => {
       ev.preventDefault();
@@ -257,13 +556,22 @@
       });
     });
 
-    $('#btn-dns-test').addEventListener('click', (ev) => {
+    $('#dns-test-form').addEventListener('submit', (ev) => {
+      ev.preventDefault();
       runBusy(ev, async () => {
+        const host = $('#dns-test-host').value.trim();
+        const result = $('#dns-result');
+        result.classList.remove('hidden');
+        metric('#dns-result', host + ' 조회 중…');
         try {
-          const r = await LeanAPI.call('dns_test');
-          showToast('테스트: ' + (r.dns_test_ok || r.ok) + ' / ' + (r.dns_test_latency_ms || '?') + ' ms', true);
+          const r = await LeanAPI.call('dns_test', { host });
+          if (r.ok === false) throw new Error(r.error || '조회 실패');
+          const ok = dnsSucceeded(r);
+          const status = ok ? 'DNS 조회 성공' : r.dns_test_ok === 'unsupported' ? 'DNS 조회 불가' : 'DNS 조회 실패';
+          metric('#dns-result', [status + ' · ' + (r.dns_test_host || host),
+            (r.addresses || []).join(', '), ok && fmtLatency(r)].filter(Boolean).join('\n'), ok ? 'ok' : 'error');
         } catch (e) {
-          showToast(e.message, false);
+          metric('#dns-result', e.message, 'error');
         }
       });
     });
@@ -283,69 +591,88 @@
       runBusy(ev, async () => {
         const hostname = $('#host-name').value.trim();
         const ip = $('#host-ip').value.trim();
-        hostsCache = hostsCache.filter((h) => h.hostname !== hostname);
-        hostsCache.push({ hostname, ip });
-        $('#host-name').value = '';
-        $('#host-ip').value = '';
-        await saveHosts();
+        if (hostsCache.some((h) => h.hostname !== editingHost && h.hostname.toLowerCase() === hostname.toLowerCase())) {
+          throw new Error('같은 호스트가 이미 있습니다. 목록에서 수정하세요.');
+        }
+        await saveHosts([...hostsCache.filter((h) => h.hostname !== editingHost), { hostname, ip }]);
       });
     });
+    $('#host-cancel').addEventListener('click', resetHostForm);
 
     $('#adblock-form').addEventListener('submit', (ev) => {
       ev.preventDefault();
       runBusy(ev, async () => {
         try {
           const r = await LeanAPI.call('adblock_set', { enabled: $('#adblock-enabled').checked });
-          if (r.ok === false) throw new Error(r.error || '실패');
-          showToast('광고 차단 설정 적용', true);
-          loadAdblock();
-        } catch (e) {
-          showToast(e.message, false);
+          if (r.ok === false) throw new Error(r.error || '설정 실패');
+          showToast('광고 차단 설정 적용됨', true);
+        } finally {
+          await loadAdblock();
         }
       });
     });
+    $('#btn-adblock-status').addEventListener('click', (ev) => runBusy(ev, loadAdblock));
     $('#btn-adblock-update').addEventListener('click', (ev) => {
       runBusy(ev, async () => {
+        const update = LeanAPI.call('adblock_update');
+        metric('#adblock-list-state', '업데이트 요청 중', 'warn');
         try {
-          const r = await LeanAPI.call('adblock_update');
+          const r = await update;
           if (r.ok === false) throw new Error(r.error || '업데이트 실패');
-          showToast('차단 목록 업데이트 완료', true);
-          loadAdblock();
-        } catch (e) {
-          showToast(e.message, false);
+          showToast(r.started === 'background' ? '업데이트 시작됨' : '목록 업데이트 완료', true);
+        } finally {
+          await loadAdblock();
         }
       });
     });
 
-    $('#allow-search').addEventListener('input', (e) => {
-      $('#allow-list').value = filterLines(allowAll.join('\n'), e.target.value);
+    $$('[data-list]').forEach((button) => button.addEventListener('click', () => {
+      currentList = button.dataset.list;
+      $$('[data-list]').forEach((b) => b.setAttribute('aria-pressed', String(b === button)));
+      $('#list-search').value = '';
+      listPage = 0;
+      renderLists();
+    }));
+    $('#list-search').addEventListener('input', () => {
+      listPage = 0;
+      renderLists();
     });
-    $('#block-search').addEventListener('input', (e) => {
-      $('#block-list').value = filterLines(blockAll.join('\n'), e.target.value);
-    });
-    $('#btn-lists-save').addEventListener('click', (ev) => {
-      runBusy(ev, async () => {
-        const allow = $('#allow-list').value.split(/\n+/).map((s) => s.trim()).filter(Boolean);
-        const block = $('#block-list').value.split(/\n+/).map((s) => s.trim()).filter(Boolean);
+    $('#list-prev').addEventListener('click', () => { listPage--; renderLists(); });
+    $('#list-next').addEventListener('click', () => { listPage++; renderLists(); });
+    for (const id of ['list-add', 'list-bulk']) {
+      $('#' + id).addEventListener('submit', (ev) => {
+        ev.preventDefault();
+        const input = ev.currentTarget.querySelector('input, textarea');
         try {
-          const r = await LeanAPI.call('lists_set', { allow, block });
-          if (r.ok === false) throw new Error(r.error || '실패');
-          showToast('목록 저장됨', true);
-          loadLists();
+          addDomains(input.value.trim().split(/\r?\n/).map((s) => s.trim()));
+          input.value = '';
         } catch (e) {
           showToast(e.message, false);
         }
       });
+    }
+    $('#btn-lists-save').addEventListener('click', () => {
+      runBusy(null, async () => {
+        const controls = $('#lists-controls');
+        controls.disabled = true;
+        try {
+          const r = await LeanAPI.call('lists_set', lists);
+          if (r.ok === false) throw new Error(r.error || '저장 실패');
+          listsDirty = false;
+          renderLists();
+          showToast('목록 저장됨. 광고 차단 화면에서 목록을 갱신하면 적용됩니다.', true);
+        } finally {
+          controls.disabled = false;
+        }
+      });
     });
 
-    $('#btn-logs').addEventListener('click', (ev) => {
-      runBusy(ev, loadSystem);
-    });
+    $('#btn-logs').addEventListener('click', (ev) => runBusy(ev, loadLogs));
     $('#btn-logs-clear').addEventListener('click', (ev) => {
       runBusy(ev, async () => {
         await LeanAPI.call('logs_clear');
         showToast('로그 초기화 요청됨', true);
-        await loadSystem();
+        await loadLogs();
       });
     });
     $('#btn-svc-restart').addEventListener('click', (ev) => {
@@ -356,49 +683,94 @@
     });
     $('#net-form').addEventListener('submit', (ev) => {
       ev.preventDefault();
-      runBusy(ev, async () => {
-        const ipaddr = $('#net-ip').value.trim();
-        const netmask = $('#net-mask').value.trim();
-        const gateway = $('#net-gw').value.trim();
+      const ipaddr = $('#net-ip').value.trim();
+      const netmask = $('#net-mask').value.trim();
+      const gateway = $('#net-gw').value.trim();
+      if (!confirm(ipaddr + '에 임시 적용할까요? 새 주소에서 120초 안에 변경을 확정하세요.')) return;
+      runBusy(null, async () => {
+        $('#net-apply').disabled = true;
         try {
           const r = await LeanAPI.call('network_set', { ipaddr, netmask, gateway });
           if (r.ok === false) throw new Error(r.error || '네트워크 적용 실패');
-          showToast('네트워크 적용됨. 새 IP로 다시 접속하세요: ' + ipaddr, true);
+          if (!r.pending_ip) throw new Error('임시 적용 응답이 없습니다.');
+          updateNetwork({ ipaddr, netmask, gateway, pending_ip: r.pending_ip, pending_state: 'applying' });
+          if (LeanAPI.state.mode === 'mock' || location.hostname === ipaddr) {
+            setTimeout(async () => {
+              if (currentPage !== 'system') return;
+              try {
+                updateNetwork(await LeanAPI.call('network_get'));
+              } catch (e) {
+                showToast(e.message, false);
+              }
+            }, 1500);
+          }
         } catch (e) {
-          showToast(e.message, false);
+          $('#net-apply').disabled = false;
+          throw e;
         }
+      });
+    });
+    $('#net-check').addEventListener('click', (ev) => {
+      runBusy(ev, async () => updateNetwork(await LeanAPI.call('network_get')));
+    });
+    $('#net-confirm').addEventListener('click', (ev) => {
+      runBusy(ev, async () => {
+        const r = await LeanAPI.call('network_confirm');
+        if (r.ok === false) throw new Error(r.error || '변경 확정 실패');
+        updateNetwork(await LeanAPI.call('network_get'));
+        showToast('네트워크 설정 저장됨', true);
       });
     });
     $('#udp-token-required').addEventListener('change', (ev) => {
-      const box = $('#udp-token-required');
+      const box = ev.currentTarget;
       const required = box.checked;
-      if (!required && !confirm('토큰 확인을 끄면 같은 LAN의 누구나 관리 IP를 바꿀 수 있습니다. 계속할까요?')) {
-        box.checked = true;
+      runBusy(ev, async () => {
+        try {
+          const r = await LeanAPI.call('udp_token_set', { required, enabled: true });
+          if (r.ok === false) throw new Error(r.error || '설정 실패');
+          box.checked = r.required !== false;
+          showToast(required ? 'UDP IP 변경에 토큰이 필요합니다.' : '토큰 없이 UDP IP 변경을 허용했습니다.', true);
+        } catch (e) {
+          box.checked = !required;
+          throw e;
+        }
+      });
+    });
+    $('#btn-udp-reveal').addEventListener('click', (ev) => {
+      if (!$('#udp-token-line').classList.contains('hidden')) {
+        hideToken();
         return;
       }
       runBusy(ev, async () => {
-        try {
-          const r = await LeanAPI.call('udp_token_set', { required });
-          if (r.ok === false) throw new Error(r.error || '설정 실패');
-          showUdpToken({ token: $('#udp-token').textContent, required: r.required !== false });
-          showToast(required ? 'UDP 토큰 확인을 켰습니다' : 'UDP 토큰 확인을 껐습니다. 토큰 없이 IP를 바꿀 수 있습니다', true);
-        } catch (e) {
-          box.checked = !required;
-          showToast(e.message, false);
-        }
+        const t = await LeanAPI.call('udp_token_get', { reveal: true });
+        if (!t.token) throw new Error(t.error || '토큰 조회 실패');
+        if (currentPage === 'system') revealToken(t.token);
       });
     });
     $('#btn-udp-regen').addEventListener('click', (ev) => {
+      if (!confirm('토큰을 재발급하면 기존 토큰을 사용할 수 없습니다. 계속할까요?')) return;
       runBusy(ev, async () => {
-        try {
-          const r = await LeanAPI.call('udp_token_regen');
-          $('#udp-token').textContent = r.token || '—';
-          showToast('UDP 토큰 재발급됨', true);
-        } catch (e) {
-          showToast(e.message, false);
-        }
+        const r = await LeanAPI.call('udp_token_regen');
+        if (r.ok === false) throw new Error(r.error || '재발급 실패');
+        hideToken();
+        showToast('UDP 토큰 재발급됨', true);
       });
     });
+    $$('.copy-command').forEach((button) => button.addEventListener('click', async () => {
+      const code = button.previousElementSibling;
+      try {
+        await navigator.clipboard.writeText(code.textContent);
+        showToast('명령어 복사됨', true);
+      } catch (_) {
+        const range = document.createRange();
+        range.selectNodeContents(code);
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+        if (document.execCommand('copy')) showToast('명령어 복사됨', true);
+        else showToast('선택된 명령어를 복사하세요.', false);
+      }
+    }));
     $('#btn-backup').addEventListener('click', (ev) => {
       runBusy(ev, async () => {
         try {
@@ -440,7 +812,10 @@
         btn.textContent = '처리중...';
       }
       $('#login-error').textContent = '';
-      LeanAPI.login($('#login-user').value.trim(), $('#login-pass').value).then(() => {
+      LeanAPI.login($('#login-user').value.trim(), $('#login-pass').value).then(async () => {
+        try {
+          setVersionLabels(await LeanAPI.call('ping'));
+        } catch (_) { /* status refresh will fill version */ }
         enterApp();
       }).catch((e) => {
         $('#login-error').textContent = '로그인 실패: ' + e.message;
@@ -454,7 +829,8 @@
 
     if (LeanAPI.isAuthed()) {
       try {
-        await LeanAPI.call('ping');
+        const pong = await LeanAPI.call('ping');
+        setVersionLabels(pong);
         enterApp();
         return;
       } catch (_) {
@@ -471,7 +847,7 @@
   function enterApp() {
     $('#login-view').classList.add('hidden');
     $('#app').classList.remove('hidden');
-    showPage('dashboard');
+    showPage(location.hash === '#system' ? 'system' : 'dashboard');
   }
 
   boot();

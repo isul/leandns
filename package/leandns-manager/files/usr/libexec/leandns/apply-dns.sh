@@ -32,6 +32,7 @@ restore_state() {
 	[ -f "$BACKUP_DIR/hosts" ] && cp -a "$BACKUP_DIR/hosts" "$HOSTS_FILE"
 	[ -f "$BACKUP_DIR/leandns.conf" ] && cp -a "$BACKUP_DIR/leandns.conf" "$CUSTOM_CONF"
 	uci commit dhcp 2>/dev/null || true
+	build_hosts
 	/etc/init.d/dnsmasq restart >/dev/null 2>&1 || true
 }
 
@@ -108,6 +109,12 @@ restart_dnsmasq() {
 
 do_apply() {
 	backup_state
+	if [ -n "${1:-}" ]; then
+		if ! awk '{h[$1]=$0} END {for (k in h) print h[k]}' "$1" | sort > "$HOSTS_FILE"; then
+			restore_state
+			return 1
+		fi
+	fi
 	build_hosts
 	if ! apply_uci; then
 		restore_state
@@ -127,11 +134,15 @@ case "${1:-}" in
 	--boot|--apply|"")
 		do_apply
 		;;
+	--hosts)
+		[ "$#" = 2 ] && [ -f "$2" ] || exit 2
+		do_apply "$2"
+		;;
 	--rollback)
 		restore_state
 		;;
 	*)
-		echo "usage: $0 [--boot|--apply|--rollback]" >&2
+		echo "usage: $0 [--boot|--apply|--hosts FILE|--rollback]" >&2
 		exit 2
 		;;
 esac

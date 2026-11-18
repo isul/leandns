@@ -68,6 +68,11 @@ def main():
     code, p = ms.handle_api("status", {}, True)
     check(p.get("dnsmasq_running") is True, "status dns running")
     check(p.get("cache_hit_rate") == "unsupported", "no fake cache hit rate")
+    check(bool(p.get("firmware")), "status includes firmware")
+    check(bool(p.get("version")), "status includes version")
+
+    code, p = ms.handle_api("ping", {}, True)
+    check(p.get("firmware") and p.get("version"), "ping includes firmware/version")
 
     code, p = ms.handle_api(
         "dns_set",
@@ -120,6 +125,44 @@ def main():
 
     code, p = ms.handle_api("adblock_update", {"force_fail": True}, True)
     check(p.get("ok") is False, "adblock update failure retained")
+
+    _, adblock = call("adblock_status", sid=sid)
+    check(adblock["list_state"] == "applied" and adblock["update_result"] == "low_ram",
+          "adblock update failure preserves applied list")
+
+    _, probe = call("dns_test", {"host": "nas.home.arpa"}, sid)
+    check(probe["addresses"] == ["192.168.0.201"] and probe["dns_test_latency_ms"] == 0,
+          "test an entered domain and return its answers")
+    _, probe = call("dns_test", {"host": "bad host"}, sid)
+    check(probe["ok"] is False, "invalid probe domain rejected")
+
+    _, token_info = call("udp_token_get", sid=sid)
+    check(token_info["enabled"] is True and token_info["required"] is True and "token" not in token_info,
+          "UDP SET on by default with token required and token hidden")
+    _, token_info = call("udp_token_get", {"reveal": True}, sid)
+    check(bool(token_info["token"]), "authenticated token reveal")
+    _, off = call("udp_token_set", {"required": False}, sid)
+    check(off["ok"] is True and off["required"] is False and off["enabled"] is True,
+          "token can be disabled while UDP SET stays allowed")
+    _, enabled = call("udp_token_set", {"required": True}, sid)
+    check(enabled["enabled"] is True and enabled["required"] is True, "token can be required again")
+
+    _, before = call("network_get", sid=sid)
+    candidate = {"ipaddr": "192.168.10.250", "netmask": "255.255.255.0", "gateway": "192.168.10.1"}
+    _, staged = call("network_set", candidate, sid)
+    check(staged["pending_ip"] == candidate["ipaddr"], "network change staged")
+    _, conflict = call("network_set", candidate, sid)
+    check(conflict["ok"] is False, "concurrent network change rejected")
+    ms.STATE["network_pending"]["deadline"] = 0
+    _, restored = call("network_get", sid=sid)
+    check(restored == before, "expired network change rolls back")
+    call("network_set", candidate, sid)
+    code, _ = call("network_confirm")
+    check(code == 401, "network confirmation requires authentication")
+    _, confirmed = call("network_confirm", sid=sid)
+    _, stored = call("network_get", sid=sid)
+    check(confirmed["ok"] is True and not stored["pending_ip"] and stored["ipaddr"] == candidate["ipaddr"],
+          "authenticated confirmation saves network change")
 
     code, p = ms.handle_api("backup_export", {}, True)
     check(p.get("ok") is True and p.get("data_base64"), "backup export")

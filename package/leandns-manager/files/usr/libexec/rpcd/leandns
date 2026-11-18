@@ -8,6 +8,35 @@ HOSTS=/etc/leandns/hosts
 ALLOW=/etc/leandns/allow.list
 BLOCK=/etc/leandns/block.list
 VALIDATE=/usr/bin/leandns-validate
+NETWORK=/usr/libexec/leandns/apply-network.sh
+TOKEN=/etc/leandns/udp.token
+
+new_udp_token() {
+	umask 077
+	tmp="$(mktemp /etc/leandns/.udp.token.XXXXXX)" || return 1
+	value="$(hexdump -n 16 -e '16/1 "%02x"' /dev/urandom)"
+	if [ "${#value}" -eq 32 ] && printf '%s\n' "$value" > "$tmp" && mv -f "$tmp" "$TOKEN"; then
+		return 0
+	fi
+	rm -f "$tmp"
+	return 1
+}
+
+udp_enabled() {
+	[ "$(uci -q get leandns.main.udp_set_enabled || echo 0)" = 1 ]
+}
+
+udp_token_required() {
+	[ "$(uci -q get leandns.main.udp_token_required || echo 1)" = 1 ]
+}
+
+udp_required_json() {
+	udp_token_required && echo true || echo false
+}
+
+udp_enabled_json() {
+	udp_enabled && echo true || echo false
+}
 
 case "$1" in
 	list)
@@ -24,7 +53,7 @@ case "$1" in
 		"ipv6_dns": false,
 		"dns_test_host": "one.one.one.one"
 	},
-	"dns_test": {},
+	"dns_test": { "host": "" },
 	"dns_restart": {},
 	"hosts_list": {},
 	"hosts_set": { "hosts": [] },
@@ -46,8 +75,9 @@ case "$1" in
 		"netmask": "255.255.255.0",
 		"gateway": "192.168.0.1"
 	},
-	"udp_token_get": {},
-	"udp_token_set": { "required": true },
+	"network_confirm": {},
+	"udp_token_get": { "reveal": true },
+	"udp_token_set": { "enabled": true, "required": true },
 	"udp_token_regen": {}
 }
 EOF
@@ -59,7 +89,18 @@ EOF
 		[ -n "$input" ] || input="{}"
 		case "$method" in
 			ping)
-				echo '{"ok":true,"service":"leandns","version":"1.0.0"}'
+				ver="$(tr -d '\r\n' < /etc/leandns/version 2>/dev/null || true)"
+				ver="${ver:-1.0.0}"
+				fw=
+				if [ -r /etc/openwrt_release ]; then
+					# shellcheck disable=SC1091
+					. /etc/openwrt_release
+					fw="${DISTRIB_DESCRIPTION:-${DISTRIB_RELEASE:-}}"
+				fi
+				[ -n "$fw" ] || fw=unsupported
+				ver_j="$(printf '%s' "$ver" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+				fw_j="$(printf '%s' "$fw" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+				printf '{"ok":true,"service":"leandns","version":"%s","firmware":"%s"}\n' "$ver_j" "$fw_j"
 				;;
 			auth_required)
 				force="$(uci -q get leandns.main.force_password_change 2>/dev/null || echo 1)"
@@ -151,7 +192,9 @@ EOF
 				fi
 				;;
 			dns_test)
-				/usr/libexec/leandns/status.sh --quick | sed 's/^{/{"ok":true,/'
+				json_load "$input"
+				json_get_var host host
+				/usr/libexec/leandns/status.sh --dns-test "$host"
 				;;
 			dns_restart)
 				if /etc/init.d/dnsmasq restart >/dev/null 2>&1; then
@@ -176,23 +219,38 @@ EOF
 				printf ']}\n'
 				;;
 			hosts_set)
-				tmp="$(mktemp)"
-				# Expect {"hosts":[{"hostname":"...","ip":"..."},...]}
-				printf '%s' "$input" | sed 's/},{/}\n{/g' | while IFS= read -r obj; do
-					h="$(printf '%s' "$obj" | sed -n 's/.*"hostname"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n1)"
-					ip="$(printf '%s' "$obj" | sed -n 's/.*"ip"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n1)"
-					[ -z "$h" ] && continue
-					[ -z "$ip" ] && continue
-					"$VALIDATE" hostrecord "$h" "$ip" || continue
-					printf '%s %s\n' "$h" "$ip"
-				done > "$tmp"
-				# Deduplicate by hostname (last wins)
-				awk '{h[$1]=$0} END {for (k in h) print h[k]}' "$tmp" | sort > "$HOSTS"
-				rm -f "$tmp"
-				if /usr/libexec/leandns/apply-dns.sh --apply >/dev/null 2>&1; then
+				json_load "$input"
+				json_get_type type hosts
+				if [ "$type" != array ] || ! json_select hosts; then
+					echo '{"ok":false,"error":"내부 DNS 레코드 목록이 필요합니다."}'
+					exit 0
+				fi
+				tmp="$(mktemp /etc/leandns/.hosts.XXXXXX)" || {
+					echo '{"ok":false,"error":"임시 레코드 파일 생성 실패"}'
+					exit 0
+				}
+				trap 'rm -f "$tmp"' EXIT
+				json_get_keys keys
+				for key in $keys; do
+					h=
+					ip=
+					if json_select "$key"; then
+						json_get_var h hostname
+						json_get_var ip ip
+						json_select ..
+					fi
+					case "$h" in *[!A-Za-z0-9.-]*) h= ;; esac
+					case "$ip" in *[!0-9a-fA-F.:]*) ip= ;; esac
+					if ! "$VALIDATE" hostrecord "$h" "$ip"; then
+						echo '{"ok":false,"error":"호스트 이름과 IP 주소를 확인하세요."}'
+						exit 0
+					fi
+					printf '%s %s\n' "$h" "$ip" >> "$tmp"
+				done
+				if /usr/libexec/leandns/apply-dns.sh --hosts "$tmp" >/dev/null 2>&1; then
 					echo '{"ok":true}'
 				else
-					echo '{"ok":false,"error":"apply failed; rolled back"}'
+					echo '{"ok":false,"error":"내부 DNS 레코드를 적용하지 못했습니다."}'
 				fi
 				;;
 			adblock_status)
@@ -233,14 +291,15 @@ EOF
 				# Split allow / block sections crudely
 				allow_part="$(printf '%s' "$input" | sed -n 's/.*"allow"[[:space:]]*:[[:space:]]*\[\([^]]*\)\].*/\1/p')"
 				block_part="$(printf '%s' "$input" | sed -n 's/.*"block"[[:space:]]*:[[:space:]]*\[\([^]]*\)\].*/\1/p')"
+				# BusyBox tr lacks [:space:] classes and would delete letters a,c,e,s,p instead.
 				printf '%s\n' "$allow_part" | sed 's/"[[:space:]]*,[[:space:]]*"/\n/g; s/"//g' | while IFS= read -r d; do
-					d="$(echo "$d" | tr -d '[:space:]')"
+					d="$(printf '%s' "$d" | tr -d ' \t\r\n')"
 					[ -z "$d" ] && continue
 					"$VALIDATE" domain "$d" || continue
 					printf '%s\n' "$d"
 				done | sort -u > "$tmpa"
 				printf '%s\n' "$block_part" | sed 's/"[[:space:]]*,[[:space:]]*"/\n/g; s/"//g' | while IFS= read -r d; do
-					d="$(echo "$d" | tr -d '[:space:]')"
+					d="$(printf '%s' "$d" | tr -d ' \t\r\n')"
 					[ -z "$d" ] && continue
 					"$VALIDATE" domain "$d" || continue
 					printf '%s\n' "$d"
@@ -252,7 +311,7 @@ EOF
 				echo '{"ok":true}'
 				;;
 			system_info)
-				/usr/libexec/leandns/status.sh --quick
+				/usr/libexec/leandns/status.sh --system
 				;;
 			system_restart_services)
 				/etc/init.d/dnsmasq restart >/dev/null 2>&1 || true
@@ -290,8 +349,9 @@ EOF
 				ipaddr="$(uci -q get network.lan.ipaddr)"
 				netmask="$(uci -q get network.lan.netmask)"
 				gateway="$(uci -q get network.lan.gateway)"
-				printf '{"ipaddr":"%s","netmask":"%s","gateway":"%s"}\n' \
-					"${ipaddr:-192.168.0.250}" "${netmask:-255.255.255.0}" "${gateway:-192.168.0.1}"
+				pending="$("$NETWORK" --pending)"
+				printf '{"ipaddr":"%s","netmask":"%s","gateway":"%s",%s}\n' \
+					"${ipaddr:-192.168.0.250}" "${netmask:-255.255.255.0}" "${gateway:-192.168.0.1}" "$pending"
 				;;
 			network_set)
 				ipaddr="$(printf '%s' "$input" | sed -n 's/.*"ipaddr"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n1)"
@@ -301,50 +361,66 @@ EOF
 					echo '{"ok":false,"error":"missing fields"}'
 					exit 0
 				}
-				/usr/libexec/leandns/apply-network.sh "$ipaddr" "$netmask" "$gateway"
+				"$NETWORK" --web "$ipaddr" "$netmask" "$gateway"
+				;;
+			network_confirm)
+				"$NETWORK" --confirm
 				;;
 			udp_token_get)
-				mkdir -p /etc/leandns
-				if [ ! -s /etc/leandns/udp.token ]; then
-					tr -dc 'A-Za-z0-9' </dev/urandom 2>/dev/null | head -c 24 > /etc/leandns/udp.token || \
-						date +%s | md5sum | cut -c1-24 > /etc/leandns/udp.token
-					chmod 600 /etc/leandns/udp.token
+				json_load "$input"
+				json_get_var reveal reveal
+				# Ensure UDP SET stays available; checkbox only controls token requirement.
+				if ! udp_enabled; then
+					uci -q set leandns.main.udp_set_enabled=1
+					uci commit leandns >/dev/null 2>&1 || true
 				fi
-				tok="$(cat /etc/leandns/udp.token 2>/dev/null | tr -d '\n\r')"
-				req="$(uci -q get leandns.main.udp_token_required 2>/dev/null || echo 1)"
-				if [ "$req" = "0" ]; then
-					reqj=false
+				if [ "$reveal" = 1 ]; then
+					if [ ! -s "$TOKEN" ] && ! new_udp_token; then
+						echo '{"ok":false,"error":"토큰 생성 실패"}'
+						exit 0
+					fi
+					tok="$(tr -cd 'A-Za-z0-9' < "$TOKEN")"
+					printf '{"token":"%s","port":37421,"required":%s,"enabled":%s}\n' \
+						"$tok" "$(udp_required_json)" "$(udp_enabled_json)"
 				else
-					reqj=true
+					printf '{"port":37421,"required":%s,"enabled":%s}\n' \
+						"$(udp_required_json)" "$(udp_enabled_json)"
 				fi
-				printf '{"token":"%s","port":37421,"required":%s}\n' "$tok" "$reqj"
 				;;
 			udp_token_set)
-				req="$(printf '%s' "$input" | sed -n 's/.*"required"[[:space:]]*:[[:space:]]*\(true\|false\).*/\1/p' | head -n1)"
-				case "$req" in
-					true)
-						uci -q set leandns.main.udp_token_required='1'
-						reqj=true
-						;;
-					false)
-						uci -q set leandns.main.udp_token_required='0'
-						reqj=false
-						;;
+				json_load "$input"
+				json_get_var enabled enabled
+				json_get_var required required
+				# Prefer explicit required. Legacy clients sent only enabled:
+				# enabled=1 → token on, enabled=0 → token off (SET still allowed).
+				case "$required" in
+					0|false) req=0 ;;
+					1|true) req=1 ;;
 					*)
-						echo '{"ok":false,"error":"missing required"}'
-						exit 0
+						case "$enabled" in
+							0|false) req=0 ;;
+							1|true) req=1 ;;
+							*)
+								echo '{"ok":false,"error":"required 또는 enabled 값이 필요합니다."}'
+								exit 0
+								;;
+						esac
 						;;
 				esac
-				uci commit leandns
-				printf '{"ok":true,"required":%s}\n' "$reqj"
+				if uci -q set leandns.main.udp_token_required="$req" &&
+					uci -q set leandns.main.udp_set_enabled=1 &&
+					uci commit leandns; then
+					printf '{"ok":true,"required":%s,"enabled":true}\n' "$(udp_required_json)"
+				else
+					echo '{"ok":false,"error":"UDP 설정 저장 실패"}'
+				fi
 				;;
 			udp_token_regen)
-				mkdir -p /etc/leandns
-				tr -dc 'A-Za-z0-9' </dev/urandom 2>/dev/null | head -c 24 > /etc/leandns/udp.token || \
-					date +%s | md5sum | cut -c1-24 > /etc/leandns/udp.token
-				chmod 600 /etc/leandns/udp.token
-				tok="$(cat /etc/leandns/udp.token | tr -d '\n\r')"
-				printf '{"ok":true,"token":"%s","port":37421}\n' "$tok"
+				if new_udp_token; then
+					echo '{"ok":true,"port":37421}'
+				else
+					echo '{"ok":false,"error":"토큰 재발급 실패"}'
+				fi
 				;;
 			*)
 				echo '{"error":"unknown method"}'

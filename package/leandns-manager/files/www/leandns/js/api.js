@@ -95,5 +95,44 @@
     return !!(state.session && state.session !== '00000000000000000000000000000000');
   }
 
-  global.LeanAPI = { state, call, login, logout, isAuthed, ubusCall };
+  async function uploadFirmware(file, onProgress) {
+    if (!file) throw new Error('파일이 없습니다.');
+    if (state.mode === 'mock') {
+      if (onProgress) onProgress(0.3);
+      const data = await mockCall('firmware_upload', { size: file.size, name: file.name });
+      if (onProgress) onProgress(1);
+      if (data.error || data.ok === false) throw new Error(data.error || '업로드 실패');
+      return data;
+    }
+    const sid = state.session;
+    if (!sid) throw new Error('로그인이 필요합니다.');
+    return await new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', '/cgi-bin/leandns-fw-upload?session=' + encodeURIComponent(sid));
+      xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+      xhr.setRequestHeader('X-Session', sid);
+      xhr.upload.onprogress = (ev) => {
+        if (onProgress && ev.lengthComputable && ev.total > 0) onProgress(ev.loaded / ev.total);
+      };
+      xhr.onerror = () => reject(new Error('업로드 네트워크 오류'));
+      xhr.onload = () => {
+        let data;
+        try {
+          data = JSON.parse(xhr.responseText || '{}');
+        } catch (_) {
+          reject(new Error('업로드 응답이 JSON이 아닙니다.'));
+          return;
+        }
+        if (xhr.status >= 400 || data.ok === false) {
+          reject(new Error((data && data.error) || ('업로드 실패 (' + xhr.status + ')')));
+          return;
+        }
+        if (onProgress) onProgress(1);
+        resolve(data);
+      };
+      xhr.send(file);
+    });
+  }
+
+  global.LeanAPI = { state, call, login, logout, isAuthed, ubusCall, uploadFirmware };
 })(window);

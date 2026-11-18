@@ -64,6 +64,11 @@ case "$1" in
 	"lists_set": { "allow": [], "block": [] },
 	"system_info": {},
 	"system_restart_services": {},
+	"firmware_status": {},
+	"firmware_prepare": { "size": 0 },
+	"firmware_verify": {},
+	"firmware_abort": {},
+	"firmware_apply": { "keep_settings": true },
 	"logs_get": { "lines": 100 },
 	"logs_clear": {},
 	"backup_export": {},
@@ -103,11 +108,18 @@ EOF
 				printf '{"ok":true,"service":"leandns","version":"%s","firmware":"%s"}\n' "$ver_j" "$fw_j"
 				;;
 			auth_required)
-				force="$(uci -q get leandns.main.force_password_change 2>/dev/null || echo 1)"
-				if [ "$force" = "1" ]; then
-					echo '{"force_password_change":true}'
-				else
+				# Real check: /etc/shadow (UCI force_password_change is only a cache).
+				# root:: / root:! / root:* / root:x = unset/locked; root:$… = password set.
+				# SSH passwd does not clear the UCI flag, so never trust UCI alone.
+				if grep -q '^root:[^!*:x]' /etc/shadow 2>/dev/null; then
+					# Heal stale flag left over from install / older builds
+					if [ "$(uci -q get leandns.main.force_password_change 2>/dev/null)" = "1" ]; then
+						uci -q set leandns.main.force_password_change='0'
+						uci commit leandns
+					fi
 					echo '{"force_password_change":false}'
+				else
+					echo '{"force_password_change":true}'
 				fi
 				;;
 			status)
@@ -318,6 +330,25 @@ EOF
 				/etc/init.d/leandns reload >/dev/null 2>&1 || true
 				echo '{"ok":true}'
 				;;
+			firmware_status)
+				/usr/libexec/leandns/firmware-ctl.sh status
+				;;
+			firmware_prepare)
+				sz="$(printf '%s' "$input" | sed -n 's/.*"size"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p' | head -n1)"
+				sz="${sz:-0}"
+				/usr/libexec/leandns/firmware-ctl.sh prepare "$sz"
+				;;
+			firmware_verify)
+				/usr/libexec/leandns/firmware-ctl.sh verify
+				;;
+			firmware_abort)
+				/usr/libexec/leandns/firmware-ctl.sh abort
+				;;
+			firmware_apply)
+				keep="$(printf '%s' "$input" | sed -n 's/.*"keep_settings"[[:space:]]*:[[:space:]]*\(true\|false\).*/\1/p' | head -n1)"
+				keep="${keep:-true}"
+				/usr/libexec/leandns/firmware-ctl.sh apply "$keep"
+				;;
 			logs_get)
 				lines="$(printf '%s' "$input" | sed -n 's/.*"lines"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p' | head -n1)"
 				lines="${lines:-100}"
@@ -341,6 +372,7 @@ EOF
 				fi
 				;;
 			password_changed)
+				# Optional explicit clear; auth_required also heals from /etc/shadow.
 				uci -q set leandns.main.force_password_change='0'
 				uci commit leandns
 				echo '{"ok":true}'

@@ -69,8 +69,12 @@ EOF
 
 
 
-# Force password change flag for UI
-uci -q set leandns.main.force_password_change='1'
+# UI warning cache: unset/locked root → warn; real hash → clear
+if grep -q '^root:[^!*:x]' /etc/shadow 2>/dev/null; then
+	uci -q set leandns.main.force_password_change='0'
+else
+	uci -q set leandns.main.force_password_change='1'
+fi
 uci -q set leandns.main.enabled='1'
 
 uci -q commit dhcp
@@ -90,5 +94,12 @@ touch "$LEANDNS_MARK"
 	/etc/init.d/leandns-stats enable >/dev/null 2>&1 || true
 	/etc/init.d/leandns-stats start >/dev/null 2>&1 || true
 }
+
+# adblock-lean boot enable (rc.d links; avoid host-dash Image Builder enable failure)
+if [ -x /etc/init.d/adblock-lean ]; then
+	mkdir -p /etc/rc.d
+	[ -L /etc/rc.d/S99adblock-lean ] || ln -sf ../init.d/adblock-lean /etc/rc.d/S99adblock-lean
+	[ -L /etc/rc.d/K04adblock-lean ] || ln -sf ../init.d/adblock-lean /etc/rc.d/K04adblock-lean
+fi
 
 exit 0

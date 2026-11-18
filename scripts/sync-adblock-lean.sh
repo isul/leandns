@@ -21,5 +21,18 @@ cp -a "$VENDOR/usr/lib/adblock-lean/"*.sh "$DEST/usr/lib/adblock-lean/"
 cp -a "$ROOT/configs/adblock-lean.mini.conf" "$DEST/etc/adblock-lean/config"
 cp -a "$ROOT/configs/adblock-lean.mini.conf" "$DEST/etc/adblock-lean/config.mini"
 
+# Re-apply Image Builder host-/bin/sh workaround after upstream refresh.
+"$ROOT/scripts/patch-adblock-lean-ib.sh" "$DEST/etc/init.d/adblock-lean"
+
+# Registry required by adblock-lean check_libs() before start/update.
+(
+  cd "$DEST"
+  md5sum \
+    etc/init.d/adblock-lean \
+    usr/lib/adblock-lean/abl-lib.sh \
+    usr/lib/adblock-lean/abl-process.sh |
+    sed 's#^\([0-9a-f]*\)  #\1  /#' > etc/adblock-lean/abl-reg.md5
+)
+
 echo "OK: adblock-lean synced to package ($(cut -c1-12 "$VENDOR/COMMIT"))"
 echo "Staging: ./scripts/package.sh"

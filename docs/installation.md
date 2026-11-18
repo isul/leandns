@@ -90,6 +90,9 @@ Linux 빌드 호스트:
 ```bash
 ./scripts/build.sh
 # 산출물: firmware/bin/
+#   leandns-1.0.0-sysupgrade.bin   ← 웹 UI / sysupgrade
+#   leandns-1.0.0-factory.bin      ← ASUS Firmware Restoration
+#   openwrt-24.10.0-…-sysupgrade.bin / factory.bin  (원본명, 참고용)
 ```
 
 Windows 11에서는 WSL2 Ubuntu에서 동일 스크립트를 실행한다.

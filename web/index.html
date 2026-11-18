@@ -302,6 +302,19 @@
           <button id="btn-udp-reveal" type="button" class="secondary">토큰 표시</button>
           <button id="btn-udp-regen" type="button" class="secondary">토큰 재발급</button>
         </div>
+        <h3>펌웨어 업그레이드</h3>
+        <p class="muted"><code>leandns-*-sysupgrade.bin</code>만 사용하세요. <code>*-factory.bin</code>은 Firmware Restoration용이며 웹 업그레이드에 맞지 않습니다. 이미지는 <code>/tmp</code>(RAM)에 한 번만 저장합니다.</p>
+        <div class="form" id="fw-form">
+          <label class="file-btn">sysupgrade 이미지 선택 (.bin)<input id="fw-file" type="file" accept=".bin,application/octet-stream"></label>
+          <p id="fw-file-label" class="muted">선택된 파일 없음</p>
+          <label class="check"><input id="fw-keep" type="checkbox" checked> 설정 유지</label>
+          <div class="row">
+            <button id="btn-fw-upload" type="button">업로드 및 검사</button>
+            <button id="btn-fw-apply" type="button" disabled>업그레이드 적용</button>
+            <button id="btn-fw-abort" type="button" class="secondary" disabled>취소</button>
+          </div>
+          <p id="fw-status" class="result muted" role="status"></p>
+        </div>
         <h3>로그</h3>
         <pre id="sys-logs" class="logs"></pre>
         <div class="row">
@@ -311,7 +324,6 @@
           <button id="btn-backup" type="button">설정 내보내기</button>
           <label class="file-btn">설정 가져오기<input id="import-file" type="file" accept=".tar.gz,.b64,.txt,application/json"></label>
         </div>
-        <p class="muted">펌웨어 업데이트는 이 메뉴에서 수행하지 않습니다. 별도 복구 절차를 사용하세요.</p>
       </section>
 
       <section id="page-help" class="page hidden">

@@ -1,0 +1,84 @@
+#!/bin/sh
+# LeanDNS firmware upload CGI.
+# Accepts a raw POST body (application/octet-stream) and writes ONCE to /tmp.
+# Auth: luci/rpcd session id via ?session= or X-Session header.
+
+IMG=/tmp/leandns-sysupgrade.bin
+LOCK=/tmp/leandns-fw.lock
+MAX_BYTES=16777216
+
+emit() {
+	printf 'Status: %s\r\nContent-Type: application/json\r\nCache-Control: no-store\r\n\r\n' "${2:-200}"
+	printf '%s' "$1"
+}
+
+fail() {
+	emit "{\"ok\":false,\"error\":\"$1\"}" "${2:-400}"
+	exit 0
+}
+
+# Parse session= from QUERY_STRING
+sid=
+IFS='&'
+for part in ${QUERY_STRING:-}; do
+	case "$part" in
+		session=*) sid="${part#session=}" ;;
+	esac
+done
+unset IFS
+[ -n "$sid" ] || sid="${HTTP_X_SESSION:-}"
+
+case "$sid" in
+	''|*[!0-9a-fA-F]*|00000000000000000000000000000000) fail "인증이 필요합니다." 401 ;;
+esac
+# OpenWrt sessions are 32 hex chars
+[ "${#sid}" -eq 32 ] || fail "인증이 필요합니다." 401
+
+# Verify session can call firmware_apply (write ACL)
+access="$(ubus -S call session access "{\"ubus_rpc_session\":\"$sid\",\"scope\":\"ubus\",\"object\":\"leandns\",\"function\":\"firmware_apply\"}" 2>/dev/null || true)"
+case "$access" in
+	*'"access":true'*|*'"access": true'*) ;;
+	*) fail "권한이 없거나 세션이 만료되었습니다." 403 ;;
+esac
+
+[ "${REQUEST_METHOD:-}" = POST ] || fail "POST만 지원합니다." 405
+
+len="${CONTENT_LENGTH:-}"
+case "$len" in
+	''|*[!0-9]*) fail "Content-Length가 필요합니다." ;;
+esac
+[ "$len" -ge 1048576 ] || fail "이미지 파일이 너무 작습니다."
+[ "$len" -le "$MAX_BYTES" ] || fail "이미지 파일이 너무 큽니다."
+
+mkdir "$LOCK" 2>/dev/null || fail "다른 업로드가 진행 중입니다." 409
+trap 'rmdir "$LOCK" 2>/dev/null || true' EXIT
+
+tmp_free="$(df -k /tmp 2>/dev/null | awk 'NR==2 {print $4}')"
+tmp_free="${tmp_free:-0}"
+need_kb=$(( (len + 1023) / 1024 + 512 ))
+[ "$tmp_free" -ge "$need_kb" ] || fail "/tmp 공간이 부족합니다 (${tmp_free}KB < ${need_kb}KB)."
+
+ram="$(awk '/^MemAvailable:/ {print $2; found=1} END {if (!found) print 0}' /proc/meminfo 2>/dev/null || echo 0)"
+head="$(uci -q get leandns.main.upgrade_headroom_kb 2>/dev/null || true)"
+head="${head:-6144}"
+need_ram=$(( (len + 1023) / 1024 + head ))
+[ "$ram" -ge "$need_ram" ] || fail "가용 RAM이 부족합니다 (${ram}KB < ${need_ram}KB)."
+
+# Single write: stream stdin directly to final path (no staging copy).
+rm -f "$IMG"
+# BusyBox head -c reads exactly N bytes from stdin.
+if ! head -c "$len" > "$IMG"; then
+	rm -f "$IMG"
+	fail "업로드 중 쓰기에 실패했습니다." 500
+fi
+
+got="$(wc -c < "$IMG" | tr -d ' ')"
+if [ "$got" != "$len" ]; then
+	rm -f "$IMG"
+	fail "업로드 크기가 일치하지 않습니다 (${got} != ${len})." 500
+fi
+
+printf '%s\n' uploaded > /var/lib/leandns/firmware.state 2>/dev/null || true
+logger -t leandns-firmware "upload ok bytes=${got} ram=${ram}KB tmp_free=${tmp_free}KB"
+emit "{\"ok\":true,\"bytes\":${got},\"path\":\"${IMG}\"}"
+exit 0

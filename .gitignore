@@ -14,6 +14,7 @@ firmware/bin/
 firmware/files/
 firmware/leandns-manager-files/
 firmware/update-bundle/
+firmware/toolchain/
 firmware/*.bin
 firmware/*.tar.zst
 firmware/*.img

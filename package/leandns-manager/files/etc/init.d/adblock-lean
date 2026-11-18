@@ -2057,14 +2057,20 @@ set_ansi
 check_func failsafe_log && UPD_SOURCED=1
 
 # test process substitution support
-printf '%s\n%s\n' "#!/bin/sh" "printf %s >(:)" > /tmp/abl-test
-if ! /bin/sh /tmp/abl-test 1>/dev/null 2>/dev/null
+# LeanDNS: skip process-substitution self-check under IPKG_INSTROOT
+# (Image Builder / opkg staging uses host /bin/sh, often dash without >().
+#  Device ash supports it; keep the real check for on-device runs.)
+if [ -z "${IPKG_INSTROOT}" ]
 then
+	printf '%s\n%s\n' "#!/bin/sh" "printf %s >(:)" > /tmp/abl-test
+	if ! /bin/sh /tmp/abl-test 1>/dev/null 2>/dev/null
+	then
+		rm -f /tmp/abl-test
+		reg_failure "This shell does not support process substitution. To use adblock-lean, please update OpenWrt to 22.03 or later version."
+		graceful_exit 1
+	fi
 	rm -f /tmp/abl-test
-	reg_failure "This shell does not support process substitution. To use adblock-lean, please update OpenWrt to 22.03 or later version."
-	graceful_exit 1
 fi
-rm -f /tmp/abl-test
 
 detect_main_utils || graceful_exit 1
 

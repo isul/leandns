@@ -6,7 +6,7 @@
 
 | 구성 | 설명 |
 |------|------|
-| 장치 데몬 | `leandns-discoverd` (Go mipsle softfloat) UDP **37421** |
+| 장치 데몬 | `leandns-discoverd` (C mipsel softfloat) UDP **37421** |
 | 토큰 | `/etc/leandns/udp.token` (웹 시스템 메뉴에서 표시 또는 재발급) |
 | UDP IP 변경 | UCI `leandns.main.udp_set_enabled` (기본 `1`, 항상 허용) |
 | UDP 토큰 | UCI `leandns.main.udp_token_required` (기본 `1`) |
@@ -19,7 +19,7 @@ DISCOVER는 인증 없이 현재 설정과 토큰 필요 여부(`token_required`
 
 ```bash
 ./scripts/build-udp-tool.sh
-./scripts/build-discoverd.sh      # 장치용 mipsel softfloat 데몬
+./scripts/build-discoverd.sh      # 장치용 C mipsel softfloat 데몬
 ./scripts/make-update-bundle.sh   # 웹+API+데몬 부분 갱신 번들
 ```
 
@@ -81,5 +81,5 @@ gradlew.bat assembleDebug
 
 ## 참고
 
-- 장치 쪽 데몬: Go `cmd/leandns-discoverd/main.go` → `./scripts/build-discoverd.sh` (mipsle softfloat, CGO 없음).
+- 장치 쪽 데몬: C `cmd/leandns-discoverd/discoverd.c` → `./scripts/build-discoverd.sh` (mipsel softfloat musl).
 - Android 클라이언트: `android/leandns-tool/` (동일 프로토콜).

@@ -135,6 +135,9 @@ STATE = {
         "dnsmasq: mock ready",
     ],
     "backup": None,
+    "firmware_state": "idle",
+    "firmware_image": None,
+    "firmware_rebooting": False,
     "dnsmasq_running": True,
     "start": time.time(),
     "network": {
@@ -214,8 +217,9 @@ def handle_api(method: str, body: dict, authed: bool):
 
     if method in ("ping", "auth_required"):
         if method == "ping":
-            if not authed:
-                return 401, {"error": "unauthorized"}
+            # Match device ACL: ping is unauthenticated (used while waiting for reboot).
+            if STATE.get("firmware_rebooting"):
+                return 503, {"ok": False, "error": "rebooting"}
             return 200, {
                 "ok": True,
                 "service": "leandns",
@@ -324,6 +328,70 @@ def handle_api(method: str, body: dict, authed: bool):
         return 200, status_payload()
     if method == "system_restart_services":
         return 200, {"ok": True}
+    if method == "firmware_status":
+        img = STATE.get("firmware_image")
+        state = STATE.get("firmware_state", "idle")
+        return 200, {
+            "ok": True,
+            "state": state,
+            "image_present": bool(img),
+            "verified": state == "verified" and bool(img),
+            "image_kb": int((img or {}).get("kb", 0)),
+            "mem_available_kb": 14852,
+            "tmp_free_kb": 28088,
+            "min_free_ram_kb": 8192,
+            "upgrade_headroom_kb": 6144,
+        }
+    if method == "firmware_prepare":
+        size = int(body.get("size") or 0)
+        STATE["firmware_state"] = "prepared"
+        STATE["firmware_image"] = None
+        return 200, {
+            "ok": True,
+            "mem_available_kb": 20000,
+            "tmp_free_kb": 28000,
+            "min_free_ram_kb": 8192,
+            "upgrade_headroom_kb": 6144,
+            "image_path": "/tmp/leandns-sysupgrade.bin",
+            "size": size,
+        }
+    if method == "firmware_upload":
+        size = int(body.get("size") or 0)
+        name = body.get("name") or "firmware.bin"
+        if size < 1024 * 1024:
+            return 200, {"ok": False, "error": "이미지 파일이 너무 작습니다."}
+        if "factory" in name.lower() or "sysupgrade" not in name.lower():
+            return 200, {
+                "ok": False,
+                "error": "factory.bin은 Firmware Restoration용입니다. *-sysupgrade.bin을 사용하세요.",
+            }
+        STATE["firmware_image"] = {"kb": (size + 1023) // 1024, "name": name}
+        STATE["firmware_state"] = "uploaded"
+        return 200, {"ok": True, "bytes": size, "path": "/tmp/leandns-sysupgrade.bin"}
+    if method == "firmware_verify":
+        if not STATE.get("firmware_image"):
+            return 200, {"ok": False, "error": "업로드된 이미지가 없습니다."}
+        STATE["firmware_state"] = "verified"
+        return 200, {"ok": True, "verified": True, "image_kb": STATE["firmware_image"]["kb"]}
+    if method == "firmware_abort":
+        STATE["firmware_image"] = None
+        STATE["firmware_state"] = "idle"
+        return 200, {"ok": True}
+    if method == "firmware_apply":
+        if not STATE.get("firmware_image"):
+            return 200, {"ok": False, "error": "업로드된 이미지가 없습니다."}
+        if STATE.get("firmware_state") != "verified":
+            return 200, {"ok": False, "error": "먼저 이미지 검사를 통과해야 합니다."}
+        STATE["firmware_state"] = "applying"
+        STATE["firmware_rebooting"] = True
+        def _mock_fw_back():
+            time.sleep(4)
+            with STATE_LOCK:
+                STATE["firmware_rebooting"] = False
+                STATE["firmware_image"] = None
+                STATE["firmware_state"] = "idle"
+        threading.Thread(target=_mock_fw_back, daemon=True).start()
+        return 200, {"ok": True, "started": True, "keep_settings": bool(body.get("keep_settings", True))}
     if method == "logs_get":
         n = min(int(body.get("lines", 100)), 500)
         return 200, {"lines": STATE["logs"][-n:]}

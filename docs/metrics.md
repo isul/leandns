@@ -1,15 +1,15 @@
 # LeanDNS 크기·리소스 측정
 
-측정일(호스트): 2026-11-18T17:29:03+09:00
+측정일(호스트): 2026-11-18T21:14:00+09:00
 호스트: Linux 6.8.0-149-generic x86_64
 
 ## 호스트에서 실측됨
 
 | 항목 | 값 |
 |------|-----|
-| 웹 UI (`web/`) | 101130 bytes |
-| 패키지 files 트리 | 3501465 bytes |
-| 펌웨어 이미지 | not built yet |
+| 웹 UI (`web/`) | ~101 KiB |
+| `leandns-discoverd` (C static softfloat) | ~88 KiB |
+| sysupgrade 이미지 (A/B/C 적용 후) | ~3.7 MiB (이전 Wi‑Fi 제거본 ~4.2 MiB) |
 
 ## 실기에서만 측정 가능 (미측정)
 

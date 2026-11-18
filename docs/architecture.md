@@ -28,9 +28,10 @@ Admin Browser ──HTTP──► uhttpd ── / and /leandns/ (same static UI)
 | 차단 | adblock-lean Mini |
 | 웹 | uhttpd + 정적 UI |
 | API | rpcd/ubus + ucode |
-| 인증 | luci-base 세션 (전체 LuCI UI 미포함) |
+| 인증 | rpcd ubus `session` (LuCI UI / luci-base 미포함) |
 | DoH/DoT | 1차 제외 |
 | 역할 | DNS 전용 LAN 어플라이언스 (DHCP/라우팅 비목표) |
+| 방화벽 | firewall4/nft 스택 제외 (메인 공유기 뒤 LAN 전제) |
 
 ## 네트워크 기본값
 

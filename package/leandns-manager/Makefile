@@ -19,7 +19,7 @@ define Package/leandns-manager
   SECTION:=net
   CATEGORY:=Network
   TITLE:=LeanDNS lightweight smart DNS manager
-  DEPENDS:=+dnsmasq +uhttpd +rpcd +libubus +libuci +luci-base
+  DEPENDS:=+dnsmasq +uhttpd +uhttpd-mod-ubus +rpcd +rpcd-mod-ucode +libubus +libuci
   PKGARCH:=all
 endef
 
@@ -60,6 +60,7 @@ define Package/leandns-manager/install
 	$(INSTALL_DIR) $(1)/www/leandns/js
 
 	$(INSTALL_BIN) ./files/www/cgi-bin/luci $(1)/www/cgi-bin/luci
+	$(INSTALL_BIN) ./files/www/cgi-bin/leandns-fw-upload $(1)/www/cgi-bin/leandns-fw-upload
 	$(INSTALL_CONF) ./files/etc/config/leandns $(1)/etc/config/leandns
 
 
@@ -68,6 +69,9 @@ define Package/leandns-manager/install
 	$(INSTALL_BIN) ./files/etc/init.d/leandns-stats $(1)/etc/init.d/leandns-stats
 	$(INSTALL_BIN) ./files/etc/init.d/leandns-discover $(1)/etc/init.d/leandns-discover
 	$(INSTALL_BIN) ./files/etc/init.d/adblock-lean $(1)/etc/init.d/adblock-lean
+	$(INSTALL_DIR) $(1)/etc/rc.d
+	$(LN) ../init.d/adblock-lean $(1)/etc/rc.d/S99adblock-lean
+	$(LN) ../init.d/adblock-lean $(1)/etc/rc.d/K04adblock-lean
 	$(INSTALL_BIN) ./files/etc/uci-defaults/99-leandns $(1)/etc/uci-defaults/99-leandns
 	$(INSTALL_DATA) ./files/etc/leandns/hosts $(1)/etc/leandns/hosts
 	$(INSTALL_DATA) ./files/etc/leandns/allow.list $(1)/etc/leandns/allow.list
@@ -75,6 +79,8 @@ define Package/leandns-manager/install
 	$(INSTALL_DATA) ./files/etc/leandns/version $(1)/etc/leandns/version
 	$(INSTALL_DATA) ./files/etc/adblock-lean/config $(1)/etc/adblock-lean/config
 	$(INSTALL_DATA) ./files/etc/adblock-lean/config $(1)/etc/adblock-lean/config.mini
+	$(INSTALL_DATA) ./files/etc/adblock-lean/abl-reg.md5 $(1)/etc/adblock-lean/abl-reg.md5
+	$(INSTALL_DATA) ./files/etc/adblock-lean/VERSION $(1)/etc/adblock-lean/VERSION
 	$(INSTALL_DATA) ./files/usr/lib/adblock-lean/abl-lib.sh $(1)/usr/lib/adblock-lean/abl-lib.sh
 	$(INSTALL_DATA) ./files/usr/lib/adblock-lean/abl-process.sh $(1)/usr/lib/adblock-lean/abl-process.sh
 	$(INSTALL_DATA) ./files/usr/share/rpcd/acl.d/leandns.json $(1)/usr/share/rpcd/acl.d/leandns.json
@@ -88,6 +94,7 @@ define Package/leandns-manager/install
 	$(INSTALL_BIN) ./files/usr/libexec/leandns/backup.sh $(1)/usr/libexec/leandns/backup.sh
 	$(INSTALL_BIN) ./files/usr/libexec/leandns/status.sh $(1)/usr/libexec/leandns/status.sh
 	$(INSTALL_BIN) ./files/usr/libexec/leandns/stats-ctl.sh $(1)/usr/libexec/leandns/stats-ctl.sh
+	$(INSTALL_BIN) ./files/usr/libexec/leandns/firmware-ctl.sh $(1)/usr/libexec/leandns/firmware-ctl.sh
 	$(INSTALL_BIN) ./files/usr/libexec/leandns/www-root.sh $(1)/usr/libexec/leandns/www-root.sh
 	$(INSTALL_BIN) ./files/usr/bin/leandns-validate $(1)/usr/bin/leandns-validate
 	$(INSTALL_DATA) ./files/etc/leandns/upstream.list $(1)/etc/leandns/upstream.list

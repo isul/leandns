@@ -9,7 +9,11 @@ METRICS="$ROOT/docs/metrics.md"
 web_b="$(du -sb "$ROOT/web" | awk '{print $1}')"
 pkg_b="$(du -sb "$ROOT/package/leandns-manager/files" | awk '{print $1}')"
 fw_note="not built yet"
-if compgen -G "$ROOT/firmware/openwrt-*-sysupgrade.bin" >/dev/null; then
+if compgen -G "$ROOT/firmware/bin/leandns-*-sysupgrade.bin" >/dev/null; then
+  fw_note="$(du -h "$ROOT/firmware/bin"/leandns-*-sysupgrade.bin | head -n1 | awk '{print $1, $2}')"
+elif compgen -G "$ROOT/firmware/bin/openwrt-*-sysupgrade.bin" >/dev/null; then
+  fw_note="$(du -h "$ROOT/firmware/bin"/openwrt-*-sysupgrade.bin | head -n1 | awk '{print $1, $2}')"
+elif compgen -G "$ROOT/firmware/openwrt-*-sysupgrade.bin" >/dev/null; then
   fw_note="$(du -h "$ROOT/firmware"/openwrt-*-sysupgrade.bin | awk '{print $1, $2}')"
 fi
 

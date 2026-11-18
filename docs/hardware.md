@@ -37,7 +37,7 @@ RT-AC1200 (비-V2) 이미지는 사용하지 않는다.
 ## 64 MiB RAM 리스크
 
 - 최신 OpenWrt는 64 MiB에서 여유가 매우 적다.
-- LeanDNS 기본: **DNS 전용**, Wi-Fi 패키지 제거, adblock-lean **Mini** (~85k, `hagezi:pro.mini`).
+- LeanDNS 기본: **DNS 전용**, Wi-Fi·PPP·odhcp·luci-base UI·firewall4/nft NAT·offload 제거, adblock-lean **Mini** (~85k, `hagezi:pro.mini`).
 - 차단목록 업데이트 중 peak RSS는 **실기에서만** 측정 가능. 측정 전 “여유 충분”으로 단정하지 않는다.
 
 ## 설치 개요 (승인 후)

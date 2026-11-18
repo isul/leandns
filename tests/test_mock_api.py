@@ -126,6 +126,25 @@ def main():
     )
     check(p.get("ok") is True and ms.STATE["allow"] == ["ok.test"], "lists dedupe")
 
+    code, p = ms.handle_api("firmware_prepare", {"size": 3800000}, True)
+    check(p.get("ok") is True, "firmware prepare")
+    code, p = ms.handle_api(
+        "firmware_upload", {"size": 3800000, "name": "openwrt-squashfs-factory.bin"}, True
+    )
+    check(p.get("ok") is False, "factory firmware rejected")
+    code, p = ms.handle_api(
+        "firmware_upload",
+        {"size": 3800000, "name": "openwrt-squashfs-sysupgrade.bin"},
+        True,
+    )
+    check(p.get("ok") is True, "firmware upload mock")
+    code, p = ms.handle_api("firmware_verify", {}, True)
+    check(p.get("ok") is True and p.get("verified") is True, "firmware verify")
+    code, p = ms.handle_api("firmware_status", {}, True)
+    check(p.get("image_present") is True and p.get("verified") is True, "firmware status verified")
+    code, p = ms.handle_api("firmware_abort", {}, True)
+    check(p.get("ok") is True, "firmware abort")
+
     code, p = ms.handle_api("adblock_update", {}, True)
     check(p.get("ok") is True, "adblock update")
 

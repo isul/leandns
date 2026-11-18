@@ -608,6 +608,47 @@
     $('#sys-logs').textContent = (logs.lines || []).join('\n') || '(로그 없음)';
   }
 
+  function setFirmwareUi(state) {
+    const ready = !!(state && state.image_present && (state.verified || state.state === 'verified'));
+    const applying = state && state.state === 'applying';
+    const btnApply = $('#btn-fw-apply');
+    const btnAbort = $('#btn-fw-abort');
+    if (btnApply) btnApply.disabled = !ready || applying;
+    if (btnAbort) {
+      btnAbort.disabled = !state || !(state.image_present || state.state === 'prepared' || state.state === 'uploaded' || state.state === 'verified');
+    }
+  }
+
+  function isSysupgradeName(name) {
+    const n = String(name || '').toLowerCase();
+    if (!/\.bin$/i.test(n)) return false;
+    if (n.includes('factory')) return false;
+    return n.includes('sysupgrade');
+  }
+
+  async function refreshFirmwareStatus(msg) {
+    const st = await LeanAPI.call('firmware_status');
+    setFirmwareUi(st);
+    if (msg != null) metric('#fw-status', msg, /실패|불가|부족|factory/i.test(String(msg)) ? 'error' : (st.verified ? 'ok' : ''));
+    else if (st.image_present && st.verified) {
+      metric('#fw-status',
+        '검사 통과 · ' + fmtBytesKb(st.image_kb) +
+        ' · 가용 RAM ' + fmtBytesKb(st.mem_available_kb) +
+        ' · /tmp ' + fmtBytesKb(st.tmp_free_kb),
+        'ok');
+    } else if (st.image_present) {
+      metric('#fw-status',
+        '업로드됨(미검사) · ' + fmtBytesKb(st.image_kb) +
+        ' · 가용 RAM ' + fmtBytesKb(st.mem_available_kb),
+        'warn');
+    } else {
+      metric('#fw-status',
+        '대기 · 가용 RAM ' + fmtBytesKb(st.mem_available_kb) +
+        ' · /tmp ' + fmtBytesKb(st.tmp_free_kb));
+    }
+    return st;
+  }
+
   async function loadSystem() {
     try {
       const [s, n, t] = await Promise.all([
@@ -620,6 +661,11 @@
       updateNetwork(n);
       $('#udp-token-required').checked = t.required !== false;
       $('#udp-token-required').disabled = false;
+      try {
+        await refreshFirmwareStatus();
+      } catch (_) {
+        metric('#fw-status', '펌웨어 상태 조회 불가');
+      }
       await loadLogs();
     } catch (e) {
       showToast(e.message, false);
@@ -907,6 +953,119 @@
         else showToast('선택된 명령어를 복사하세요.', false);
       }
     }));
+    $('#fw-file').addEventListener('change', () => {
+      const file = $('#fw-file').files && $('#fw-file').files[0];
+      $('#fw-file-label').textContent = file
+        ? (file.name + ' · ' + fmtBytesKb(Math.ceil(file.size / 1024)))
+        : '선택된 파일 없음';
+      $('#btn-fw-apply').disabled = true;
+    });
+
+    $('#btn-fw-upload').addEventListener('click', (ev) => {
+      const file = $('#fw-file').files && $('#fw-file').files[0];
+      if (!file) {
+        showToast('sysupgrade .bin 파일을 선택하세요.', false);
+        return;
+      }
+      if (!isSysupgradeName(file.name)) {
+        showToast('factory.bin이 아닙니다. *-sysupgrade.bin 파일을 선택하세요.', false);
+        metric('#fw-status', 'factory.bin은 Firmware Restoration용입니다. sysupgrade.bin을 사용하세요.', 'error');
+        return;
+      }
+      runBusy(ev, async () => {
+        metric('#fw-status', 'RAM 확보 및 준비 중…', 'warn');
+        const prep = await LeanAPI.call('firmware_prepare', { size: file.size });
+        if (prep.ok === false) throw new Error(prep.error || '준비 실패');
+        metric('#fw-status', '업로드 중… 0%', 'warn');
+        const up = await LeanAPI.uploadFirmware(file, (p) => {
+          metric('#fw-status', '업로드 중… ' + Math.round(p * 100) + '%', 'warn');
+        });
+        if (up.ok === false) throw new Error(up.error || '업로드 실패');
+        metric('#fw-status', '이미지 검사 중…', 'warn');
+        const ver = await LeanAPI.call('firmware_verify');
+        if (ver.ok === false) {
+          await LeanAPI.call('firmware_abort').catch(() => {});
+          $('#btn-fw-apply').disabled = true;
+          throw new Error(ver.error || '이미지 검사 실패');
+        }
+        await refreshFirmwareStatus('검사 통과 · 업그레이드 적용을 눌러 진행하세요.');
+        showToast('펌웨어 업로드·검사 완료', true);
+      });
+    });
+
+    $('#btn-fw-abort').addEventListener('click', (ev) => {
+      runBusy(ev, async () => {
+        const r = await LeanAPI.call('firmware_abort');
+        if (r.ok === false) throw new Error(r.error || '취소 실패');
+        $('#fw-file').value = '';
+        $('#fw-file-label').textContent = '선택된 파일 없음';
+        await refreshFirmwareStatus('업로드가 취소되었습니다.');
+        showToast('펌웨어 업로드 취소됨', true);
+      });
+    });
+
+    $('#btn-fw-apply').addEventListener('click', (ev) => {
+      const keep = $('#fw-keep').checked;
+      const warn = keep
+        ? '펌웨어를 적용하고 재부팅합니다. 설정은 유지됩니다. 전원을 유지하세요.'
+        : '펌웨어를 적용하고 재부팅합니다. 설정이 초기화됩니다. 전원을 유지하세요.';
+      if (!confirm(warn + '\n계속할까요?')) return;
+      runBusy(ev, async () => {
+        metric('#fw-status', '업그레이드 적용 중… 재부팅까지 기다리세요.', 'warn');
+        let r;
+        try {
+          r = await LeanAPI.call('firmware_apply', { keep_settings: keep });
+        } catch (e) {
+          await refreshFirmwareStatus(e.message || '적용 실패');
+          throw e;
+        }
+        if (r.ok === false) {
+          await refreshFirmwareStatus(r.error || '적용 실패');
+          throw new Error(r.error || '적용 실패');
+        }
+        showToast('업그레이드 시작됨 · 재부팅 대기', true);
+        // Require offline→online transition. Immediate ping success is still the old OS.
+        let tries = 0;
+        let sawDown = false;
+        const anonymousSid = '00000000000000000000000000000000';
+        const pollPing = async () => {
+          if (LeanAPI.state.mode === 'mock') return LeanAPI.call('ping');
+          return LeanAPI.ubusCall('leandns', 'ping', {}, anonymousSid);
+        };
+        const tick = async () => {
+          tries += 1;
+          let up = false;
+          let ping = null;
+          try {
+            ping = await pollPing();
+            up = !!(ping && ping.ok);
+          } catch (_) {
+            up = false;
+          }
+          if (!up) {
+            if (!sawDown) {
+              sawDown = true;
+              // Old session will be invalid after reboot.
+              try { await LeanAPI.logout(); } catch (_) { /* ignore */ }
+            }
+            metric('#fw-status', '재부팅 중… 응답 대기 (' + tries + ')', 'warn');
+          } else if (!sawDown) {
+            metric('#fw-status', '플래시/재부팅 준비 중… 아직 이전 펌웨어가 응답 중 (' + tries + ')', 'warn');
+          } else {
+            metric('#fw-status', '재부팅 완료 · ' + (ping.firmware || 'OK'), 'ok');
+            showToast('장치가 다시 온라인입니다. 다시 로그인하세요.', true);
+            return;
+          }
+          if (tries > 120) {
+            metric('#fw-status', '응답 없음 · 전원 LED와 복구 절차를 확인하세요.', 'error');
+            return;
+          }
+          window.setTimeout(tick, 2000);
+        };
+        window.setTimeout(tick, 3000);
+      });
+    });
+
     $('#btn-backup').addEventListener('click', (ev) => {
       runBusy(ev, async () => {
         try {

@@ -1,0 +1,11 @@
+firmware/ib/
+firmware/bin/
+firmware/files/
+firmware/leandns-manager-files/
+firmware/*.bin
+firmware/*.tar.zst
+__pycache__/
+*.pyc
+.DS_Store
+*.swp
+.host-session

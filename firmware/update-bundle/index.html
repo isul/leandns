@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LeanDNS</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <div id="login-view" class="login-wrap hidden">
+    <form id="login-form" class="login-card" autocomplete="on">
+      <h1>LeanDNS</h1>
+      <p class="muted">스마트 DNS 관리</p>
+      <label>사용자명<input id="login-user" name="username" value="root" required></label>
+      <label>비밀번호<input id="login-pass" name="password" type="password" required></label>
+      <button type="submit">로그인</button>
+      <p id="login-error" class="error" role="alert"></p>
+      <p id="force-pw" class="warn hidden">기본 비밀번호를 변경한 뒤 사용하세요. LuCI/SSH에서 root 암호를 설정합니다.</p>
+    </form>
+  </div>
+
+  <div id="app" class="app hidden">
+    <aside class="sidebar">
+      <div class="brand">LeanDNS</div>
+      <nav>
+        <button data-page="dashboard" class="nav active">대시보드</button>
+        <button data-page="dns" class="nav">DNS 설정</button>
+        <button data-page="adblock" class="nav">광고 차단</button>
+        <button data-page="lists" class="nav">허용/차단</button>
+        <button data-page="system" class="nav">시스템</button>
+        <button data-page="help" class="nav">도움말</button>
+      </nav>
+      <div class="sidebar-foot">
+        <button id="theme-toggle" type="button" class="ghost">테마</button>
+        <button id="logout-btn" type="button" class="ghost">로그아웃</button>
+      </div>
+    </aside>
+    <main class="main">
+      <header class="top">
+        <h2 id="page-title">대시보드</h2>
+        <div id="toast" class="toast hidden" role="status"></div>
+      </header>
+
+      <section id="page-dashboard" class="page">
+        <div class="cards">
+          <article class="card"><h3>DNS 서버</h3><p id="st-dns">—</p></article>
+          <article class="card"><h3>광고 차단</h3><p id="st-adblock">—</p></article>
+          <article class="card"><h3>메모리</h3><p id="st-mem">—</p></article>
+          <article class="card"><h3>CPU</h3><p id="st-cpu">—</p></article>
+          <article class="card"><h3>차단 규칙</h3><p id="st-rules">—</p></article>
+          <article class="card"><h3>DNS 응답 테스트</h3><p id="st-rtt">—</p></article>
+          <article class="card"><h3>최근 업데이트</h3><p id="st-upd">—</p></article>
+          <article class="card"><h3>가동 시간</h3><p id="st-up">—</p></article>
+        </div>
+        <p class="muted">캐시 적중률·차단 질의 수·클라이언트별 통계: <strong>지원하지 않음</strong></p>
+        <button id="btn-refresh-status" type="button">새로고침</button>
+      </section>
+
+      <section id="page-dns" class="page hidden">
+        <form id="dns-form" class="form">
+          <label>상위 DNS 서버 (한 줄에 하나)<textarea id="dns-upstream" rows="4"></textarea></label>
+          <label>캐시 크기 (0–10000)<input id="dns-cache" type="number" min="0" max="10000"></label>
+          <label>내부 도메인<input id="dns-domain" type="text"></label>
+          <label>DNS 테스트 호스트<input id="dns-test-host" type="text"></label>
+          <label class="check"><input id="dns-ipv6" type="checkbox"> IPv6 DNS (AAAA 필터 해제)</label>
+          <div class="row">
+            <button type="submit">저장 및 적용</button>
+            <button id="btn-dns-test" type="button" class="secondary">DNS 테스트</button>
+            <button id="btn-dns-restart" type="button" class="secondary">DNS 재시작</button>
+          </div>
+        </form>
+        <h3>내부 DNS 레코드</h3>
+        <form id="host-add" class="form inline">
+          <input id="host-name" placeholder="nas.home.arpa" required>
+          <input id="host-ip" placeholder="192.168.0.201" required>
+          <button type="submit">추가</button>
+        </form>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>호스트</th><th>IP</th><th></th></tr></thead>
+            <tbody id="hosts-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="page-adblock" class="page hidden">
+        <form id="adblock-form" class="form">
+          <label class="check"><input id="adblock-enabled" type="checkbox"> 광고 차단 활성화</label>
+          <p class="muted">기본 목록: adblock-lean Mini (<code>hagezi:pro.mini</code>)</p>
+          <p>상태: <span id="adblock-state">—</span></p>
+          <p>규칙 수: <span id="adblock-rules">—</span></p>
+          <p>마지막 업데이트: <span id="adblock-upd">—</span></p>
+          <div class="row">
+            <button type="submit">적용</button>
+            <button id="btn-adblock-update" type="button" class="secondary">목록 수동 업데이트</button>
+          </div>
+        </form>
+      </section>
+
+      <section id="page-lists" class="page hidden">
+        <div class="split">
+          <div>
+            <h3>허용 도메인</h3>
+            <input id="allow-search" placeholder="검색" class="search">
+            <textarea id="allow-list" rows="12"></textarea>
+          </div>
+          <div>
+            <h3>차단 도메인</h3>
+            <input id="block-search" placeholder="검색" class="search">
+            <textarea id="block-list" rows="12"></textarea>
+          </div>
+        </div>
+        <p class="muted">한 줄에 도메인 하나. 저장 시 중복 제거·검증됩니다.</p>
+        <button id="btn-lists-save" type="button">목록 저장</button>
+      </section>
+
+      <section id="page-system" class="page hidden">
+        <div class="cards">
+          <article class="card"><h3>Flash 여유</h3><p id="sys-flash">—</p></article>
+          <article class="card"><h3>메모리</h3><p id="sys-mem">—</p></article>
+          <article class="card"><h3>네트워크</h3><p id="sys-net">LAN DNS 어플라이언스</p></article>
+        </div>
+        <h3>LAN IP / 게이트웨이</h3>
+        <form id="net-form" class="form">
+          <label>관리 IP<input id="net-ip" type="text" required></label>
+          <label>서브넷 마스크<input id="net-mask" type="text" required></label>
+          <label>게이트웨이 (메인 공유기)<input id="net-gw" type="text" required></label>
+          <button type="submit">네트워크 저장 및 적용</button>
+          <p class="muted">적용 후 새 IP로 다시 접속하세요. 메인 공유기 대역이 바뀌면 여기 또는 UDP 툴로 변경합니다.</p>
+        </form>
+        <h3>UDP 발견 토큰</h3>
+        <p class="muted">PC 툴 <code>leandns-tool</code>이 같은 LAN에서 이 장치를 찾아 관리 IP를 바꿀 때 사용합니다. (UDP 37421)</p>
+        <label class="check">
+          <input id="udp-token-required" type="checkbox" checked> IP 변경에 토큰 필요
+        </label>
+        <p class="muted" id="udp-token-hint">켜져 있으면 <code>leandns-tool set --token</code>이 필요합니다. 끄면 같은 LAN에서 토큰 없이 IP를 바꿀 수 있습니다.</p>
+        <p id="udp-token-line">토큰: <code id="udp-token">—</code></p>
+        <div class="row">
+          <button id="btn-udp-regen" type="button" class="secondary">토큰 재발급</button>
+        </div>
+        <h3>로그</h3>
+        <pre id="sys-logs" class="logs"></pre>
+        <div class="row">
+          <button id="btn-logs" type="button" class="secondary">로그 새로고침</button>
+          <button id="btn-logs-clear" type="button" class="secondary">로그 초기화</button>
+          <button id="btn-svc-restart" type="button" class="secondary">서비스 재시작</button>
+          <button id="btn-backup" type="button">설정 내보내기</button>
+          <label class="file-btn">설정 가져오기<input id="import-file" type="file" accept=".tar.gz,.b64,.txt,application/json"></label>
+        </div>
+        <p class="muted">펌웨어 업데이트는 이 메뉴에서 수행하지 않습니다. 별도 복구 절차를 사용하세요.</p>
+      </section>
+
+      <section id="page-help" class="page hidden">
+        <article class="help">
+          <h3>설치</h3>
+          <p>OpenWrt <code>asus_rt-ac1200-v2</code> 이미지를 ASUS Firmware Restoration으로 기록한 뒤 <code>leandns-manager</code> 패키지를 설치합니다. 자세한 내용은 저장소 <code>docs/installation.md</code>를 참고하세요.</p>
+          <h3>메인 공유기 DNS</h3>
+          <p>메인 공유기 DHCP에서 DNS를 이 장치의 LAN IP(기본 192.168.0.250)로 지정합니다. LeanDNS는 설치 시 메인 공유기를 자동 변경하지 않습니다.</p>
+          <h3>메인 공유기 IP가 바뀌면</h3>
+          <p>웹에 접속되면 시스템 메뉴에서 관리 IP, 서브넷 마스크, 게이트웨이를 저장합니다. 웹에 접속되지 않으면 같은 스위치·공유기 LAN에 연결한 PC에서 UDP 37421 브로드캐스트 툴을 사용합니다. 실행 파일은 <code>scripts/build-udp-tool.sh</code>로 만들며 <code>dist/leandns-tool/</code>에 있습니다.</p>
+          <p>Windows 11:</p>
+          <pre class="help-cmd">leandns-tool-windows-amd64.exe discover
+
+leandns-tool-windows-amd64.exe set --token "웹에표시된토큰" --ip 192.168.34.250 --netmask 255.255.255.0 --gateway 192.168.34.1</pre>
+          <p>시스템 메뉴에서 「IP 변경에 토큰 필요」를 끈 경우, Windows 11에서는 <code>--token</code>을 빼도 됩니다.</p>
+          <pre class="help-cmd">leandns-tool-windows-amd64.exe set --ip 192.168.34.250 --gateway 192.168.34.1</pre>
+          <p>Linux:</p>
+          <pre class="help-cmd">./leandns-tool-linux-amd64 discover
+./leandns-tool-linux-amd64 set --token "웹에표시된토큰" --ip 192.168.34.250 --gateway 192.168.34.1</pre>
+          <p>토큰 확인이 꺼져 있으면 Linux에서도 <code>set --ip ... --gateway ...</code>만 실행합니다. 직렬 케이블이 없어도 같은 스위치 LAN이면 장치를 찾을 수 있습니다.</p>
+          <h3>장애 복구</h3>
+          <p>Reset 복구 모드 + ASUS 복구 도구로 factory 이미지를 다시 기록합니다. <code>docs/recovery.md</code> 참고.</p>
+          <h3>DNS 우회 / IPv6</h3>
+          <p>클라이언트가 DoH를 쓰거나 IPv6 DNS를 직접 쓰면 차단을 우회할 수 있습니다. IPv6 DNS 토글과 클라이언트 DoH 비활성화를 확인하세요.</p>
+          <h3>질의 기록</h3>
+          <p>상세 DNS 질의 기록은 기본 비활성입니다. 활성화 시 개인정보가 RAM 순환 버퍼에만 남을 수 있습니다.</p>
+        </article>
+      </section>
+    </main>
+  </div>
+  <script src="js/api.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

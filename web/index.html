@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>LeanDNS</title>
-  <link rel="stylesheet" href="css/app.css?v=17">
+  <link rel="stylesheet" href="css/app.css?v=19">
   <link rel="icon" href="img/brand-icon.webp" type="image/webp">
 </head>
 <body>
@@ -93,10 +93,12 @@
         <h2 id="page-title">대시보드</h2>
       </header>
 
-      <section id="page-dashboard" class="page">
-        <div class="cards overview">
+      <section id="page-dashboard" class="page stack">
+        <div class="cards overview overview-4">
           <article class="card"><h3>DNS 서버</h3><p id="st-dns">—</p><small id="st-rtt"></small></article>
           <article class="card"><h3>광고 차단</h3><p id="st-adblock">—</p><small id="st-rules"></small></article>
+          <article class="card"><h3>최근 차단</h3><p id="st-block-10m">—</p><small id="st-block-last"></small></article>
+          <article class="card"><h3>오늘 차단</h3><p id="st-block-today">—</p><small id="st-block-delta"></small></article>
         </div>
         <div class="split">
           <article class="panel">
@@ -133,6 +135,39 @@
             </dl>
           </article>
         </div>
+        <div class="split stats-split">
+          <article class="panel">
+            <h3>최근 차단 추이</h3>
+            <div id="st-block-trend" class="block-trend" role="img" aria-label="분당 차단 추이"></div>
+            <p id="st-block-trend-note" class="muted stats-note"></p>
+          </article>
+          <article class="panel">
+            <h3>차단 요약</h3>
+            <dl class="facts" id="st-block-summary">
+              <div><dt>최근 1분</dt><dd id="st-sum-1m">—</dd></div>
+              <div><dt>최근 10분</dt><dd id="st-sum-10m">—</dd></div>
+              <div><dt>오늘</dt><dd id="st-sum-today">—</dd></div>
+              <div><dt>통계 상태</dt><dd id="st-sum-state">—</dd></div>
+            </dl>
+          </article>
+        </div>
+        <article class="panel">
+          <div class="panel-head">
+            <h3 id="st-recent-title">최근 차단 도메인</h3>
+            <span id="st-recent-hint" class="muted"></span>
+          </div>
+          <div class="table-wrap">
+            <table class="recent-blocks">
+              <thead>
+                <tr><th>#</th><th>시각</th><th>도메인</th><th>유형</th><th>클라이언트</th></tr>
+              </thead>
+              <tbody id="st-recent-body">
+                <tr><td colspan="5" class="muted">아직 차단 기록이 없습니다.</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="muted stats-note">차단 통계는 메모리에만 보관되며 재부팅 시 초기화됩니다.</p>
+        </article>
         <div class="row dashboard-actions">
           <span id="st-checked" class="muted"></span>
           <button id="btn-refresh-status" type="button" class="secondary">새로고침</button>
@@ -248,8 +283,8 @@
           <label>관리 IP<input id="net-ip" type="text" required></label>
           <label>서브넷 마스크<input id="net-mask" type="text" required></label>
           <label>게이트웨이 (메인 공유기)<input id="net-gw" type="text" required></label>
-          <button id="net-apply" type="submit">네트워크 임시 적용</button>
-          <p class="muted">적용 후 새 주소에서 다시 로그인하고 120초 안에 확정하세요. 기한이 지나면 기존 주소로 다시 접속할 수 있습니다.</p>
+          <button id="net-apply" type="submit">네트워크 적용</button>
+          <p class="muted">설정은 즉시 영구 적용됩니다. IP를 바꾼 경우 새 주소로 다시 접속하세요. (UDP 툴로 바꾼 임시 설정만 아래에서 확정합니다.)</p>
         </form>
         <div id="net-pending" class="result hidden" role="status">
           <p id="net-pending-text"></p>

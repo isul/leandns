@@ -65,6 +65,7 @@ define Package/leandns-manager/install
 
 
 	$(INSTALL_BIN) ./files/etc/init.d/leandns $(1)/etc/init.d/leandns
+	$(INSTALL_BIN) ./files/etc/init.d/leandns-stats $(1)/etc/init.d/leandns-stats
 	$(INSTALL_BIN) ./files/etc/init.d/leandns-discover $(1)/etc/init.d/leandns-discover
 	$(INSTALL_BIN) ./files/etc/init.d/adblock-lean $(1)/etc/init.d/adblock-lean
 	$(INSTALL_BIN) ./files/etc/uci-defaults/99-leandns $(1)/etc/uci-defaults/99-leandns
@@ -86,6 +87,7 @@ define Package/leandns-manager/install
 	$(INSTALL_BIN) ./files/usr/libexec/leandns/adblock-ctl.sh $(1)/usr/libexec/leandns/adblock-ctl.sh
 	$(INSTALL_BIN) ./files/usr/libexec/leandns/backup.sh $(1)/usr/libexec/leandns/backup.sh
 	$(INSTALL_BIN) ./files/usr/libexec/leandns/status.sh $(1)/usr/libexec/leandns/status.sh
+	$(INSTALL_BIN) ./files/usr/libexec/leandns/stats-ctl.sh $(1)/usr/libexec/leandns/stats-ctl.sh
 	$(INSTALL_BIN) ./files/usr/libexec/leandns/www-root.sh $(1)/usr/libexec/leandns/www-root.sh
 	$(INSTALL_BIN) ./files/usr/bin/leandns-validate $(1)/usr/bin/leandns-validate
 	$(INSTALL_DATA) ./files/etc/leandns/upstream.list $(1)/etc/leandns/upstream.list
@@ -98,8 +100,10 @@ define Package/leandns-manager/postinst
 [ -n "$${IPKG_INSTROOT}" ] || {
 	/usr/libexec/leandns/www-root.sh >/dev/null 2>&1 || true
 	/etc/init.d/leandns enable >/dev/null 2>&1 || true
+	/etc/init.d/leandns-stats enable >/dev/null 2>&1 || true
 	/etc/init.d/leandns-discover enable >/dev/null 2>&1 || true
 	/etc/init.d/leandns-discover restart >/dev/null 2>&1 || true
+	/etc/init.d/leandns-stats restart >/dev/null 2>&1 || true
 	/etc/init.d/rpcd restart >/dev/null 2>&1 || true
 	/etc/init.d/uhttpd restart >/dev/null 2>&1 || true
 }
@@ -109,6 +113,8 @@ endef
 define Package/leandns-manager/prerm
 #!/bin/sh
 [ -n "$${IPKG_INSTROOT}" ] || {
+	/etc/init.d/leandns-stats stop >/dev/null 2>&1 || true
+	/etc/init.d/leandns-stats disable >/dev/null 2>&1 || true
 	/etc/init.d/leandns-discover stop >/dev/null 2>&1 || true
 	/etc/init.d/leandns-discover disable >/dev/null 2>&1 || true
 	/etc/init.d/leandns stop >/dev/null 2>&1 || true

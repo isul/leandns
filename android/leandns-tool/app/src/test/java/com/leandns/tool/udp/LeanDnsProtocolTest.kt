@@ -56,4 +56,38 @@ class LeanDnsProtocolTest {
         val reply = LeanDnsProtocol.parseReply("10.0.0.1", "LEANDNS1|SET_OK|{\"ok\":true}")
         assertTrue(reply is ProtocolReply.SetOk)
     }
+
+    @Test
+    fun parseSetErrExtractsMessage() {
+        val reply = LeanDnsProtocol.parseReply(
+            "10.0.0.1",
+            """LEANDNS1|SET_ERR|{"ok":false,"error":"다른 네트워크 변경이 진행 중입니다."}""",
+        ) as ProtocolReply.SetErr
+        assertEquals("다른 네트워크 변경이 진행 중입니다.", reply.message)
+    }
+
+    @Test
+    fun formatSetFailureIncludesGuidance() {
+        val reply = LeanDnsProtocol.parseReply(
+            "10.0.0.1",
+            """LEANDNS1|SET_ERR|{"ok":false,"error":"다른 네트워크 변경이 진행 중입니다."}""",
+        )
+        val text = LeanDnsProtocol.formatSetFailure(listOf(reply))
+        assertTrue(text.contains("다른 네트워크 변경이 진행 중입니다."))
+        assertTrue(text.contains("120초"))
+    }
+
+    @Test
+    fun formatSetFailureNoReply() {
+        val text = LeanDnsProtocol.formatSetFailure(emptyList())
+        assertTrue(text.contains("장치 응답이 없습니다."))
+    }
+
+    @Test
+    fun formatSetSuccessMentionsConfirm() {
+        val text = LeanDnsProtocol.formatSetSuccess("192.168.0.250")
+        assertTrue(text.contains("192.168.0.250"))
+        assertTrue(text.contains("120초"))
+        assertTrue(text.contains("확정"))
+    }
 }

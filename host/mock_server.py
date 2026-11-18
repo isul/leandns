@@ -51,6 +51,65 @@ def valid_upstream(s: str) -> bool:
     return valid_ipv4(host) or valid_ipv6(host) or valid_domain(host)
 
 
+MOCK_RECENT_BLOCKS = [
+    ("googleads.g.doubleclick.net", "광고", "192.168.1.34"),
+    ("pagead2.googlesyndication.com", "광고", "192.168.1.12"),
+    ("analytics.twitter.com", "추적", "192.168.1.23"),
+    ("ads.yahoo.com", "광고", "192.168.1.45"),
+    ("securepubads.g.doubleclick.net", "광고", "192.168.1.34"),
+    ("static.adsafeprotected.com", "추적", "192.168.1.18"),
+    ("adservice.google.com", "광고", "192.168.1.12"),
+    ("pixel.facebook.com", "추적", "192.168.1.23"),
+    ("tpc.googlesyndication.com", "광고", "192.168.1.34"),
+    ("cdn.ampproject.org", "차단", "192.168.1.45"),
+    ("ad.doubleclick.net", "광고", "192.168.1.12"),
+    ("metrics.icloud.com", "추적", "192.168.1.18"),
+    ("ads-api.twitter.com", "광고", "192.168.1.23"),
+    ("googleadservices.com", "광고", "192.168.1.34"),
+    ("tracking.example.test", "추적", "192.168.1.45"),
+    ("partnerad.l.doubleclick.net", "광고", "192.168.1.12"),
+    ("ads.linkedin.com", "광고", "192.168.1.18"),
+    ("bat.bing.com", "추적", "192.168.1.23"),
+    ("adclick.g.doubleclick.net", "광고", "192.168.1.34"),
+    ("cm.g.doubleclick.net", "광고", "192.168.1.45"),
+]
+
+
+def mock_block_stats():
+    now = int(time.time())
+    cur_min = now // 60
+    trend_counts = [12, 18, 9, 27, 31, 22, 15, 40, 36, 24]
+    trend = []
+    for i, c in enumerate(trend_counts):
+        m = cur_min - (9 - i)
+        trend.append({"m": m, "c": c})
+    recent = []
+    for i, (domain, typ, client) in enumerate(MOCK_RECENT_BLOCKS[:20], start=1):
+        ts = now - (i - 1) * 3
+        recent.append(
+            {
+                "n": i,
+                "domain": domain,
+                "type": typ,
+                "client": client,
+                "ts": ts,
+            }
+        )
+    return {
+        "enabled": True,
+        "paused": False,
+        "recent_limit": 20,
+        "count_1m": trend_counts[-1],
+        "count_10m": sum(trend_counts),
+        "count_today": 12482,
+        "count_yesterday": 11550,
+        "last_block_age_sec": 2,
+        "last_block_domain": recent[0]["domain"] if recent else "",
+        "trend": trend,
+        "recent": recent,
+    }
+
+
 STATE = {
     "force_password_change": True,
     "sessions": set(),
@@ -66,7 +125,7 @@ STATE = {
     ],
     "adblock_enabled": True,
     "adblock_available": True,
-    "rule_count": 85000,
+    "rule_count": 103761,
     "last_update": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     "adblock_update_result": "unknown",
     "allow": ["example-allowed.test"],
@@ -97,25 +156,32 @@ def require_auth(handler) -> bool:
 
 def status_payload():
     up = int(time.time() - STATE["start"])
+    # Match the RT-AC750L-ish dashboard numbers from the design mock.
+    mem_total = 58266
+    mem_avail = 11674
+    flash_total = 11878
+    flash_free = 1740
+    block_stats = mock_block_stats()
     return {
         "dnsmasq_running": STATE["dnsmasq_running"],
         "uptime_sec": up,
-        "mem_total_kb": 65536,
-        "mem_available_kb": 22000,
+        "mem_total_kb": mem_total,
+        "mem_available_kb": mem_avail,
         "cpu_percent": "unsupported",
         "flash_scope": "overlay",
-        "flash_total_kb": 16064,
-        "flash_free_kb": 4200,
+        "flash_total_kb": flash_total,
+        "flash_free_kb": flash_free,
         "cachesize": STATE["dns"]["cachesize"],
         "version": "1.0.0",
-        "firmware": "OpenWrt 24.10.0 (mock)",
+        "firmware": "OpenWrt 24.10.0",
         "cache_hit_rate": "unsupported",
-        "blocked_query_count": "unsupported",
+        "blocked_query_count": block_stats["count_today"],
         "per_client_stats": "unsupported",
+        "block_stats": block_stats,
         "upstream": STATE["dns"]["upstream"],
         "internal_domain": STATE["dns"]["internal_domain"],
         "dns_test_ok": STATE["dnsmasq_running"],
-        "dns_test_latency_ms": 0,
+        "dns_test_latency_ms": 10,
         "dns_test_host": STATE["dns"]["dns_test_host"],
         "adblock": {
             "adblock_available": STATE["adblock_available"],
@@ -309,9 +375,10 @@ def handle_api(method: str, body: dict, authed: bool):
         network = {key: body.get(key, "") for key in ("ipaddr", "netmask", "gateway")}
         if not all(valid_ipv4(address) for address in network.values()):
             return 200, {"ok": False, "error": "IP 주소, 서브넷 마스크 및 게이트웨이를 확인하세요."}
-        STATE["network_pending"] = {"previous": STATE["network"], "deadline": time.monotonic() + 120}
+        # Web UI applies permanently; UDP-style pending is only simulated via network_pending.
         STATE["network"] = network
-        return 200, {"ok": True, "pending_ip": network["ipaddr"], "timeout_s": 120}
+        STATE["network_pending"] = None
+        return 200, {"ok": True, "applied": True}
     if method == "udp_token_get":
         STATE["udp_set_enabled"] = True
         result = {

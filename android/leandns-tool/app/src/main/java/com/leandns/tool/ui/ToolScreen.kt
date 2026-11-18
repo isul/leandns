@@ -28,6 +28,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.Radar
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -36,6 +37,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -47,6 +49,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.leandns.tool.ResultDialog
 import com.leandns.tool.ToolUiState
 import com.leandns.tool.ToolViewModel
 import com.leandns.tool.udp.ProtocolReply
@@ -82,6 +85,7 @@ fun ToolScreen(
         ) {
             BrandHeader()
 
+            // Progress / short context only — final results use ResultAlertDialog.
             StatusBanner(state)
 
             DiscoverSection(
@@ -122,6 +126,71 @@ fun ToolScreen(
             )
         }
     }
+
+    state.resultDialog?.let { dialog ->
+        ResultAlertDialog(
+            dialog = dialog,
+            onDismiss = viewModel::dismissResultDialog,
+            onOpenUi = if (!dialog.isError && state.ip.isNotBlank()) {
+                {
+                    val ip = state.ip.trim()
+                    viewModel.dismissResultDialog()
+                    context.startActivity(
+                        Intent(Intent.ACTION_VIEW, Uri.parse("http://$ip/leandns/")),
+                    )
+                }
+            } else {
+                null
+            },
+        )
+    }
+}
+
+@Composable
+private fun ResultAlertDialog(
+    dialog: ResultDialog,
+    onDismiss: () -> Unit,
+    onOpenUi: (() -> Unit)?,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = dialog.title,
+                color = if (dialog.isError) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.onSurface
+                },
+            )
+        },
+        text = {
+            Text(
+                text = dialog.message,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        },
+        confirmButton = {
+            if (onOpenUi != null) {
+                TextButton(onClick = onOpenUi) {
+                    Text("웹 UI 열기")
+                }
+            } else {
+                TextButton(onClick = onDismiss) {
+                    Text("확인")
+                }
+            }
+        },
+        dismissButton = if (onOpenUi != null) {
+            {
+                TextButton(onClick = onDismiss) {
+                    Text("닫기")
+                }
+            }
+        } else {
+            null
+        },
+    )
 }
 
 @Composable
@@ -239,11 +308,14 @@ private fun DeviceRow(
         Fact("GW", device.gateway)
         Fact("MAC", device.mac)
         Fact("버전", device.version)
-        Fact("SET", when (device.setEnabled) {
-            true -> "허용"
-            false -> "끔"
-            null -> "—"
-        })
+        Fact(
+            "SET",
+            when (device.setEnabled) {
+                true -> "허용"
+                false -> "끔"
+                null -> "—"
+            },
+        )
         Fact("토큰", device.tokenLabel)
         Fact("응답", device.from)
         OutlinedButton(onClick = { onOpenUi(device.uiUrl) }) {

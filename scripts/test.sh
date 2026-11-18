@@ -9,6 +9,9 @@ bash tests/test_validate.sh
 echo "==> lists dedupe"
 bash tests/test_lists_dedupe.sh
 
+echo "==> stats-ctl"
+bash tests/test_stats_ctl.sh
+
 echo "==> mock API"
 python3 tests/test_mock_api.py
 

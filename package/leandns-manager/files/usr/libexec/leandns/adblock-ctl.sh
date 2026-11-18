@@ -275,8 +275,10 @@ start_update() {
 	fi
 	write_status updating
 	[ "$action" != update ] || echo updating > "$UPDATE_FILE"
+	# Free tmpfs / shrink stats before list download·process peak RAM.
+	[ -x /usr/libexec/leandns/stats-ctl.sh ] && /usr/libexec/leandns/stats-ctl.sh pause >/dev/null 2>&1 || true
 	(
-		trap 'rmdir "$UPDATE_LOCK"' EXIT
+		trap 'rmdir "$UPDATE_LOCK"; [ -x /usr/libexec/leandns/stats-ctl.sh ] && /usr/libexec/leandns/stats-ctl.sh resume >/dev/null 2>&1 || true' EXIT
 		if (ensure_dnsmasq_confdir && ensure_mini_config && sync_custom_lists) && "$ABL_INIT" start; then
 			write_status "ok:$action"
 			[ "$action" != update ] || echo success > "$UPDATE_FILE"

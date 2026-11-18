@@ -153,6 +153,142 @@
     return a.rule_count != null && Number.isFinite(count) ? count.toLocaleString('ko-KR') : '—';
   }
 
+  function fmtCount(n) {
+    const v = Number(n);
+    return Number.isFinite(v) ? v.toLocaleString('ko-KR') : '—';
+  }
+
+  function fmtAge(sec) {
+    const v = Number(sec);
+    if (!Number.isFinite(v) || v < 0) return '';
+    if (v < 60) return '마지막 차단 ' + v + '초 전';
+    if (v < 3600) return '마지막 차단 ' + Math.floor(v / 60) + '분 전';
+    return '마지막 차단 ' + Math.floor(v / 3600) + '시간 전';
+  }
+
+  function fmtDelta(today, yesterday) {
+    const t = Number(today);
+    const y = Number(yesterday);
+    if (!Number.isFinite(t) || !Number.isFinite(y) || y <= 0) return '재부팅 후 집계';
+    const pct = Math.round(((t - y) / y) * 100);
+    if (pct === 0) return '어제와 같음';
+    return (pct > 0 ? '+' : '') + pct + '% 어제 대비';
+  }
+
+  function typeClass(label) {
+    if (label === '광고') return 'type-ad';
+    if (label === '추적') return 'type-track';
+    return 'type-block';
+  }
+
+  function fmtLocalHm(sec) {
+    const v = Number(sec);
+    if (!Number.isFinite(v) || v <= 0) return '—';
+    return new Date(v * 1000).toLocaleTimeString(undefined, {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+  }
+
+  function fmtLocalHms(sec) {
+    const v = Number(sec);
+    if (!Number.isFinite(v) || v <= 0) return '—';
+    return new Date(v * 1000).toLocaleTimeString(undefined, {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    });
+  }
+
+  function trendLabel(row) {
+    const m = Number(row && row.m);
+    if (Number.isFinite(m) && m > 0) return fmtLocalHm(m * 60);
+    return row && row.t ? String(row.t) : '—';
+  }
+
+  function updateBlockTrend(trend) {
+    const el = $('#st-block-trend');
+    if (!el) return;
+    const rows = Array.isArray(trend) ? trend : [];
+    if (!rows.length) {
+      el.innerHTML = '<p class="muted">추이 데이터 없음</p>';
+      return;
+    }
+    const max = Math.max(1, ...rows.map((r) => Number(r.c) || 0));
+    el.innerHTML = rows.map((r) => {
+      const c = Number(r.c) || 0;
+      const h = Math.max(8, Math.round((c / max) * 100));
+      const label = trendLabel(r);
+      return '<div class="trend-col" title="' + label + ' · ' + c + '건">' +
+        '<div class="trend-bar" style="height:' + h + '%"></div>' +
+        '<span class="trend-val">' + c + '</span>' +
+        '<span class="trend-label">' + label + '</span></div>';
+    }).join('');
+  }
+
+  function updateRecentBlocks(bs) {
+    const body = $('#st-recent-body');
+    const title = $('#st-recent-title');
+    const hint = $('#st-recent-hint');
+    if (!body) return;
+    const limit = Number(bs && bs.recent_limit) || 20;
+    if (title) title.textContent = '최근 차단 ' + limit + '개 도메인';
+    if (hint) {
+      hint.textContent = bs && bs.paused ? '일시 중지됨 (중요 작업 중)'
+        : (limit <= 10 ? '저메모리 · 최근 10건' : '메모리 전용');
+    }
+    const rows = (bs && Array.isArray(bs.recent)) ? bs.recent : [];
+    if (!rows.length) {
+      body.innerHTML = '<tr><td colspan="5" class="muted">아직 차단 기록이 없습니다.</td></tr>';
+      return;
+    }
+    body.innerHTML = rows.map((r) => {
+      const type = r.type || '차단';
+      const time = Number.isFinite(Number(r.ts)) ? fmtLocalHms(r.ts) : (r.time || '—');
+      return '<tr>' +
+        '<td>' + (r.n || '') + '</td>' +
+        '<td>' + time + '</td>' +
+        '<td class="domain">' + (r.domain || '—') + '</td>' +
+        '<td><span class="type-pill ' + typeClass(type) + '">' + type + '</span></td>' +
+        '<td>' + (r.client || '—') + '</td>' +
+        '</tr>';
+    }).join('');
+  }
+
+  function updateBlockStats(s) {
+    const bs = s.block_stats || {};
+    const enabled = bs.enabled === true || bs.enabled === 'true';
+    const paused = bs.paused === true || bs.paused === 'true';
+    if (!enabled) {
+      metric('#st-block-10m', '꺼짐');
+      metric('#st-block-last', '질의 로그 비활성');
+      metric('#st-block-today', '—');
+      metric('#st-block-delta', '');
+      metric('#st-sum-1m', '—');
+      metric('#st-sum-10m', '—');
+      metric('#st-sum-today', '—');
+      metric('#st-sum-state', '수집 안 함');
+      updateBlockTrend([]);
+      updateRecentBlocks({ recent_limit: 20, recent: [], paused: false });
+      metric('#st-block-trend-note', '설정에서 질의 로그를 켜면 표시됩니다.');
+      return;
+    }
+    metric('#st-block-10m', fmtCount(bs.count_10m) + '건');
+    metric('#st-block-last', fmtAge(bs.last_block_age_sec) || (bs.count_today ? '' : '아직 차단 없음'));
+    metric('#st-block-today', fmtCount(bs.count_today) + '건');
+    metric('#st-block-delta', fmtDelta(bs.count_today, bs.count_yesterday), Number(bs.count_today) >= Number(bs.count_yesterday) ? 'ok' : '');
+    metric('#st-sum-1m', fmtCount(bs.count_1m) + '건');
+    metric('#st-sum-10m', fmtCount(bs.count_10m) + '건');
+    metric('#st-sum-today', fmtCount(bs.count_today) + '건');
+    metric('#st-sum-state', paused ? '일시 중지' : (Number(bs.recent_limit) <= 10 ? '저메모리 모드' : '수집 중'),
+      paused ? 'warn' : 'ok');
+    updateBlockTrend(bs.trend);
+    updateRecentBlocks(bs);
+    metric('#st-block-trend-note', '분당 차단 수 · 최근 10분');
+  }
+
   function updateResourceMeter(meterId, readingId, amount, total) {
     const meter = $(meterId);
     const valid = Number.isFinite(amount) && Number.isFinite(total) && total > 0 && amount >= 0 && amount <= total;
@@ -179,6 +315,7 @@
       : enabledAdblock(a) ? ['적용 확인 필요', 'warn'] : ['비활성', ''];
     metric('#st-adblock', ...adblock);
     metric('#st-rules', a.list_state === 'applied' && countRules(a) !== '—' ? countRules(a) + '개 규칙' : '');
+    updateBlockStats(s);
     const hasAvailableRam = Number.isFinite(s.mem_available_kb) && s.mem_available_kb >= 0;
     const used = hasAvailableRam ? s.mem_total_kb - s.mem_available_kb : null;
     updateResourceMeter('#st-mem-meter', '#st-mem-used', used, s.mem_total_kb);
@@ -686,23 +823,22 @@
       const ipaddr = $('#net-ip').value.trim();
       const netmask = $('#net-mask').value.trim();
       const gateway = $('#net-gw').value.trim();
-      if (!confirm(ipaddr + '에 임시 적용할까요? 새 주소에서 120초 안에 변경을 확정하세요.')) return;
+      if (!confirm(ipaddr + '에 네트워크 설정을 적용할까요?\n즉시 영구 반영되며 자동으로 되돌리지 않습니다.')) return;
       runBusy(null, async () => {
         $('#net-apply').disabled = true;
         try {
           const r = await LeanAPI.call('network_set', { ipaddr, netmask, gateway });
           if (r.ok === false) throw new Error(r.error || '네트워크 적용 실패');
-          if (!r.pending_ip) throw new Error('임시 적용 응답이 없습니다.');
-          updateNetwork({ ipaddr, netmask, gateway, pending_ip: r.pending_ip, pending_state: 'applying' });
-          if (LeanAPI.state.mode === 'mock' || location.hostname === ipaddr) {
-            setTimeout(async () => {
-              if (currentPage !== 'system') return;
-              try {
-                updateNetwork(await LeanAPI.call('network_get'));
-              } catch (e) {
-                showToast(e.message, false);
-              }
-            }, 1500);
+          updateNetwork({ ipaddr, netmask, gateway, pending_ip: '', pending_state: '' });
+          if (LeanAPI.state.mode !== 'mock' && location.hostname !== ipaddr) {
+            const url = new URL(location.href);
+            url.hostname = ipaddr;
+            url.hash = 'system';
+            showToast('적용됨 · 새 주소로 접속: ' + ipaddr, true);
+            window.setTimeout(() => { location.href = url.href; }, 1200);
+          } else {
+            showToast('네트워크 설정이 적용되었습니다', true);
+            updateNetwork(await LeanAPI.call('network_get'));
           }
         } catch (e) {
           $('#net-apply').disabled = false;

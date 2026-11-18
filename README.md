@@ -56,7 +56,7 @@ adblock-lean Mini 목록 on/off, 수동 업데이트, 규칙 수를 확인합니
 
 ### 시스템
 
-LAN IP/게이트웨이 임시 적용·확정, UDP 토큰, 로그·서비스 관리를 합니다.
+LAN IP/게이트웨이 즉시 적용, UDP 토큰, 로그·서비스 관리를 합니다.
 
 ![웹 UI — 시스템](docs/images/web-system.png)
 

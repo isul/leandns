@@ -6,6 +6,7 @@ from __future__ import annotations
 import base64
 import json
 import sys
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -70,6 +71,11 @@ def main():
     check(p.get("cache_hit_rate") == "unsupported", "no fake cache hit rate")
     check(bool(p.get("firmware")), "status includes firmware")
     check(bool(p.get("version")), "status includes version")
+    bs = p.get("block_stats") or {}
+    check(bs.get("enabled") is True, "block_stats enabled")
+    check(isinstance(bs.get("count_today"), int), "block_stats count_today")
+    check(isinstance(bs.get("recent"), list) and len(bs["recent"]) == 20, "block_stats recent 20")
+    check(p.get("blocked_query_count") == bs.get("count_today"), "blocked_query_count matches today")
 
     code, p = ms.handle_api("ping", {}, True)
     check(p.get("firmware") and p.get("version"), "ping includes firmware/version")
@@ -147,22 +153,26 @@ def main():
     _, enabled = call("udp_token_set", {"required": True}, sid)
     check(enabled["enabled"] is True and enabled["required"] is True, "token can be required again")
 
-    _, before = call("network_get", sid=sid)
     candidate = {"ipaddr": "192.168.10.250", "netmask": "255.255.255.0", "gateway": "192.168.10.1"}
-    _, staged = call("network_set", candidate, sid)
-    check(staged["pending_ip"] == candidate["ipaddr"], "network change staged")
-    _, conflict = call("network_set", candidate, sid)
-    check(conflict["ok"] is False, "concurrent network change rejected")
-    ms.STATE["network_pending"]["deadline"] = 0
-    _, restored = call("network_get", sid=sid)
-    check(restored == before, "expired network change rolls back")
-    call("network_set", candidate, sid)
+    _, applied = call("network_set", candidate, sid)
+    check(applied.get("ok") is True and applied.get("applied") is True, "network applied permanently")
+    _, stored = call("network_get", sid=sid)
+    check(not stored.get("pending_ip") and stored["ipaddr"] == candidate["ipaddr"],
+          "web network_set saves without pending timeout")
+    _, again = call("network_set", candidate, sid)
+    check(again.get("ok") is True, "network can be reapplied when not pending")
+    # UDP-style pending confirm path still requires auth and clears pending.
+    ms.STATE["network_pending"] = {
+        "previous": {"ipaddr": "192.168.0.250", "netmask": "255.255.255.0", "gateway": "192.168.0.1"},
+        "deadline": time.monotonic() + 120,
+    }
+    ms.STATE["network"] = dict(candidate)
     code, _ = call("network_confirm")
     check(code == 401, "network confirmation requires authentication")
     _, confirmed = call("network_confirm", sid=sid)
-    _, stored = call("network_get", sid=sid)
-    check(confirmed["ok"] is True and not stored["pending_ip"] and stored["ipaddr"] == candidate["ipaddr"],
-          "authenticated confirmation saves network change")
+    _, after = call("network_get", sid=sid)
+    check(confirmed["ok"] is True and not after.get("pending_ip") and after["ipaddr"] == candidate["ipaddr"],
+          "authenticated confirmation clears UDP pending")
 
     code, p = ms.handle_api("backup_export", {}, True)
     check(p.get("ok") is True and p.get("data_base64"), "backup export")

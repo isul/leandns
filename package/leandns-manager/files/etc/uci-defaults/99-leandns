@@ -85,4 +85,10 @@ touch "$LEANDNS_MARK"
 # Apply dnsmasq hostfile hook if helpers exist
 [ -x /usr/libexec/leandns/apply-dns.sh ] && /usr/libexec/leandns/apply-dns.sh --boot || true
 
+# RAM-only block stats collector (query log on /tmp)
+[ -x /etc/init.d/leandns-stats ] && {
+	/etc/init.d/leandns-stats enable >/dev/null 2>&1 || true
+	/etc/init.d/leandns-stats start >/dev/null 2>&1 || true
+}
+
 exit 0

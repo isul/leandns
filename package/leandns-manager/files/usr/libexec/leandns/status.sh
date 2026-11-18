@@ -121,8 +121,20 @@ printf '"cachesize":%s,' "${cachesize:-0}"
 printf '"version":"%s",' "$(json_escape "$leandns_version")"
 printf '"firmware":"%s",' "$(json_escape "$firmware")"
 printf '"cache_hit_rate":"unsupported",'
-printf '"blocked_query_count":"unsupported",'
 printf '"per_client_stats":"unsupported",'
+if [ -x /usr/libexec/leandns/stats-ctl.sh ]; then
+	block_stats="$(/usr/libexec/leandns/stats-ctl.sh json 2>/dev/null || echo '{}')"
+else
+	block_stats='{"enabled":false,"paused":false,"recent_limit":0,"count_1m":0,"count_10m":0,"count_today":0,"count_yesterday":0,"last_block_age_sec":null,"last_block_domain":"","trend":[],"recent":[]}'
+fi
+# Prefer live today counter when available.
+blocked_today="$(printf '%s' "$block_stats" | sed -n 's/.*"count_today"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p' | head -n1)"
+if [ -n "$blocked_today" ]; then
+	printf '"blocked_query_count":%s,' "$blocked_today"
+else
+	printf '"blocked_query_count":"unsupported",'
+fi
+printf '"block_stats":%s,' "$block_stats"
 printf '"adblock":'
 if [ "$mode" = "--system" ]; then
 	printf '{}'

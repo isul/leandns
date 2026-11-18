@@ -412,6 +412,7 @@ th, td {
   outline: none;
 }
 .overview { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.overview-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .overview .card { min-height: 116px; padding: 1.125rem; }
 .overview h3 { margin-bottom: 0.55rem; }
 .overview .card p { font-size: 1.35rem; font-weight: 700; }
@@ -420,6 +421,76 @@ th, td {
   margin-top: 0.4rem;
   color: var(--muted);
   overflow-wrap: anywhere;
+}
+.stack > .cards { margin-bottom: 0; }
+.stats-note { margin-top: 0.75rem !important; font-size: 0.85rem; }
+.panel-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+.panel-head h3 { margin: 0; }
+.block-trend {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  align-items: end;
+  gap: 0.35rem;
+  min-height: 150px;
+  padding: 0.35rem 0.15rem 0;
+}
+.trend-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.25rem;
+  min-width: 0;
+  height: 150px;
+}
+.trend-bar {
+  width: 70%;
+  max-width: 1.5rem;
+  border-radius: 6px 6px 2px 2px;
+  background: linear-gradient(180deg, var(--accent-2), var(--accent));
+  min-height: 4px;
+}
+.trend-val {
+  font-size: 0.72rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.trend-label {
+  font-size: 0.68rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.recent-blocks td.domain {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.88rem;
+  overflow-wrap: anywhere;
+}
+.type-pill {
+  display: inline-block;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.type-pill.type-track {
+  background: color-mix(in srgb, #3b82f6 16%, transparent);
+  color: #2563eb;
+}
+.type-pill.type-block {
+  background: color-mix(in srgb, var(--muted) 18%, transparent);
+  color: var(--muted);
+}
+[data-theme="dark"] .type-pill.type-track {
+  color: #93c5fd;
 }
 .facts { margin: 0; }
 .facts div {
@@ -695,6 +766,13 @@ button:disabled { cursor: default; }
   .form.inline,
   .split {
     grid-template-columns: 1fr;
+  }
+  .overview-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .block-trend {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 0.45rem 0.35rem;
   }
   .overview .card {
     min-height: 0;

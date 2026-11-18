@@ -1,11 +1,12 @@
 #!/bin/sh
-# Apply LAN changes temporarily and restore the previous UCI values on timeout.
+# Apply LAN changes. Web UI commits permanently; UDP SET stays temporary with timeout restore.
 set -eu
 
 PENDING=/etc/leandns/network.pending
 VALIDATE=/usr/bin/leandns-validate
 WAIT_SECONDS=120
 BOOT_ID=/proc/sys/kernel/random/boot_id
+permanent=0
 
 log() { logger -t leandns-net "$*"; }
 error() { printf '{"ok":false,"error":"%s"}\n' "$1"; }
@@ -114,6 +115,7 @@ case "${1:-}" in
 		;;
 	--web)
 		shift
+		permanent=1
 		;;
 	*)
 		# Legacy daemons invoke this path only after their own token check.
@@ -133,6 +135,24 @@ for address in "$ipaddr" "$netmask" "$gateway"; do
 		exit 0
 	fi
 done
+
+if [ "$permanent" = 1 ]; then
+	if [ -d "$PENDING" ]; then
+		error "다른 네트워크 변경이 진행 중입니다."
+		exit 0
+	fi
+	# Reply first, then reload so the browser can finish the RPC before the IP moves.
+	(
+		sleep 1
+		if apply; then
+			log "LAN settings applied permanently"
+		else
+			log "permanent LAN apply failed"
+		fi
+	) </dev/null >/tmp/leandns-network.log 2>&1 &
+	printf '{"ok":true,"applied":true}\n'
+	exit 0
+fi
 
 umask 077
 if ! mkdir "$PENDING" 2>/dev/null; then

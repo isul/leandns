@@ -22,8 +22,13 @@ mkdir -p "$OUT"
 cp -a "$PKG/usr/libexec/rpcd/leandns" "$OUT/leandns"
 cp -a "$PKG/usr/share/rpcd/acl.d/leandns.json" "$OUT/leandns.json"
 cp -a "$PKG/usr/libexec/leandns/apply-network.sh" "$OUT/apply-network.sh"
+cp -a "$PKG/usr/libexec/leandns/apply-dns.sh" "$OUT/apply-dns.sh"
+cp -a "$PKG/usr/libexec/leandns/adblock-ctl.sh" "$OUT/adblock-ctl.sh"
+cp -a "$PKG/usr/libexec/leandns/status.sh" "$OUT/status.sh"
+cp -a "$PKG/usr/libexec/leandns/stats-ctl.sh" "$OUT/stats-ctl.sh"
 cp -a "$PKG/usr/sbin/leandns-discoverd" "$OUT/leandns-discoverd"
 cp -a "$PKG/etc/init.d/leandns-discover" "$OUT/leandns-discover"
+cp -a "$PKG/etc/init.d/leandns-stats" "$OUT/leandns-stats"
 cp -a "$WEB/index.html" "$OUT/index.html"
 cp -a "$WEB/js/app.js" "$OUT/app.js"
 cp -a "$WEB/css/app.css" "$OUT/app.css"
@@ -35,27 +40,42 @@ cat > "$OUT/install-on-device.sh" <<'EOF'
 # Run ON device after scp files into /tmp/leandns-upd/
 set -e
 D="${1:-/tmp/leandns-upd}"
+[ -x /usr/libexec/leandns/stats-ctl.sh ] && /usr/libexec/leandns/stats-ctl.sh pause || true
+[ -x "$D/stats-ctl.sh" ] && /bin/sh "$D/stats-ctl.sh" pause || true
 cp -a "$D/leandns" /usr/libexec/rpcd/leandns
 cp -a "$D/leandns.json" /usr/share/rpcd/acl.d/leandns.json
 cp -a "$D/apply-network.sh" /usr/libexec/leandns/apply-network.sh
+cp -a "$D/apply-dns.sh" /usr/libexec/leandns/apply-dns.sh
+cp -a "$D/adblock-ctl.sh" /usr/libexec/leandns/adblock-ctl.sh
+cp -a "$D/status.sh" /usr/libexec/leandns/status.sh
+cp -a "$D/stats-ctl.sh" /usr/libexec/leandns/stats-ctl.sh
 cp -a "$D/leandns-discoverd" /usr/sbin/leandns-discoverd
 cp -a "$D/leandns-discover" /etc/init.d/leandns-discover
+cp -a "$D/leandns-stats" /etc/init.d/leandns-stats
 cp -a "$D/index.html" /www/leandns/index.html
 cp -a "$D/app.js" /www/leandns/js/app.js
 cp -a "$D/app.css" /www/leandns/css/app.css
 [ -f "$D/root-index.html" ] && cp -a "$D/root-index.html" /www/index.html
 
-chmod +x /usr/libexec/rpcd/leandns /usr/libexec/leandns/apply-network.sh /usr/sbin/leandns-discoverd /etc/init.d/leandns-discover
+chmod +x /usr/libexec/rpcd/leandns /usr/libexec/leandns/*.sh /usr/sbin/leandns-discoverd /etc/init.d/leandns-discover /etc/init.d/leandns-stats
+# Enable RAM-only block stats for the dashboard (cleared on reboot).
+uci -q set leandns.main.query_log=1
+uci -q set leandns.main.query_log_max=20
+uci -q commit leandns >/dev/null 2>&1 || true
 mkdir -p /etc/leandns
 [ -s /etc/leandns/udp.token ] || tr -dc A-Za-z0-9 </dev/urandom | head -c 24 > /etc/leandns/udp.token
 chmod 600 /etc/leandns/udp.token
+/usr/libexec/leandns/apply-dns.sh --apply >/dev/null 2>&1 || true
 /etc/init.d/leandns-discover enable
 /etc/init.d/leandns-discover restart
+/etc/init.d/leandns-stats enable
+/etc/init.d/leandns-stats restart
+/usr/libexec/leandns/stats-ctl.sh resume >/dev/null 2>&1 || true
 /etc/init.d/rpcd restart
 /etc/init.d/uhttpd restart
 echo OK
 EOF
-chmod +x "$OUT/install-on-device.sh" "$OUT/apply-network.sh" "$OUT/leandns" "$OUT/leandns-discoverd" "$OUT/leandns-discover"
+chmod +x "$OUT/install-on-device.sh" "$OUT/apply-network.sh" "$OUT/apply-dns.sh" "$OUT/adblock-ctl.sh" "$OUT/status.sh" "$OUT/stats-ctl.sh" "$OUT/leandns" "$OUT/leandns-discoverd" "$OUT/leandns-discover" "$OUT/leandns-stats"
 
 echo "Staged at: $OUT"
 ls -lh "$OUT"

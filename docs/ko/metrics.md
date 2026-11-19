@@ -1,0 +1,25 @@
+[English](../metrics.md) | 한국어
+
+# LeanDNS 크기·리소스 측정
+
+측정일(호스트): 2026-11-19T13:19:10+09:00  
+호스트: Linux 6.8.0-149-generic x86_64
+
+## 호스트에서 실측됨
+
+| 항목 | 값 |
+|------|-----|
+| 웹 UI (`web/`) | 157408 bytes |
+| 패키지 files 트리 | 587600 bytes |
+| 펌웨어 이미지 | 3.7M /media/isul/zorin-dev/ISUL/LeanDNS/firmware/bin/leandns-1.0.0-sysupgrade.bin |
+
+## 실기에서만 측정 가능 (미측정)
+
+| 항목 | 상태 |
+|------|------|
+| DNS/관리 프로세스 RSS | 측정 불가 (실기 필요) |
+| 차단목록 업데이트 peak RAM | 측정 불가 (실기 필요) |
+| 부팅 후 가용 RAM | 측정 불가 (실기 필요) |
+| Flash overlay 여유 | 측정 불가 (실기 필요) |
+
+임의로 목표 달성을 표시하지 않는다. RT-AC750L 검증 전까지 실기 항목은 미완료로 둔다.

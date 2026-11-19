@@ -1,31 +1,33 @@
-# LeanDNS UDP 발견 / 네트워크 설정 툴
+English | [한국어](ko/udp-tool.md)
 
-메인 공유기 대역이 바뀌어 관리 IP로 웹 접속이 안 될 때, **같은 스위치·공유기 LAN(L2)** 에 PC에서 UDP 브로드캐스트로 장치를 찾을 수 있습니다. IP 변경은 관리자가 미리 허용한 장치에서 토큰으로 요청합니다.
+# LeanDNS UDP Discovery / Network Configuration Tool
 
-## 구성
+When the main router subnet changes and you can no longer reach the management IP, you can discover the device via UDP broadcast from a PC on the **same switch/router LAN (L2)**. IP changes are requested with a token on devices where the admin has pre-enabled it.
 
-| 구성 | 설명 |
-|------|------|
-| 장치 데몬 | `leandns-discoverd` (C mipsel softfloat) UDP **37421** |
-| 토큰 | `/etc/leandns/udp.token` (웹 시스템 메뉴에서 표시 또는 재발급) |
-| UDP IP 변경 | UCI `leandns.main.udp_set_enabled` (기본 `1`, 항상 허용) |
-| UDP 토큰 | UCI `leandns.main.udp_token_required` (기본 `1`) |
-| PC 툴 | Go `cmd/leandns-tool` → `dist/leandns-tool/` |
-| Android 앱 | Kotlin `android/leandns-tool/` (동일 프로토콜) |
+## Configuration
 
-DISCOVER는 인증 없이 현재 설정과 토큰 필요 여부(`token_required`)·SET 허용(`set_enabled`)을 반환합니다. 시스템 화면 「UDP IP 변경에 토큰 필요」가 켜져 있으면 SET에 토큰이 필요하고, 꺼져 있으면 토큰 없이 SET 할 수 있습니다. 웹 UI의 「네트워크 적용」은 즉시 영구 반영됩니다. UDP SET만 임시 적용되며, 새 주소에서 로그인한 뒤 시스템 화면에서 120초 안에 확정하세요. 기한이 지나면 기존 LAN 설정을 복구합니다.
+| Item | Description |
+|------|-------------|
+| Device daemon | `leandns-discoverd` (C mipsel softfloat) UDP **37421** |
+| Token | `/etc/leandns/udp.token` (view or regenerate in the web System menu) |
+| UDP IP change | UCI `leandns.main.udp_set_enabled` (default `1`, always allowed) |
+| UDP token | UCI `leandns.main.udp_token_required` (default `1`) |
+| PC tool | Go `cmd/leandns-tool` → `dist/leandns-tool/` |
+| Android app | Kotlin `android/leandns-tool/` (same protocol) |
 
-## 빌드 (개발 PC)
+DISCOVER returns current settings and `token_required`/`set_enabled` flags without authentication. If "Require token for UDP IP change" is on in the System screen, a token is required for SET; if off, SET can be performed without a token. The web UI "Apply Network" is permanent and immediate. Only UDP SET is temporary — log in from the new address and confirm in the System screen within 120 seconds, or the previous LAN settings will be restored.
+
+## Build (dev PC)
 
 ```bash
 ./scripts/build-udp-tool.sh
-./scripts/build-discoverd.sh      # 장치용 C mipsel softfloat 데몬
-./scripts/make-update-bundle.sh   # 웹+API+데몬 부분 갱신 번들
+./scripts/build-discoverd.sh      # device-side C mipsel softfloat daemon
+./scripts/make-update-bundle.sh   # web+API+daemon partial update bundle
 ```
 
-Windows 11용 PC 툴: `dist/leandns-tool/leandns-tool-windows-amd64.exe` (`dist/`는 gitignore)
+PC tool for Windows 11: `dist/leandns-tool/leandns-tool-windows-amd64.exe` (`dist/` is gitignored)
 
-### 장치 데몬·UI 부분 갱신 (Windows 11, 플래시 없음)
+### Partial Device Daemon/UI Update (Windows 11, no flash)
 
 ```bat
 bash scripts\make-update-bundle.sh
@@ -33,15 +35,15 @@ scp -O -r firmware\update-bundle root@192.168.200.250:/tmp/leandns-upd
 ssh root@192.168.200.250 "sh /tmp/leandns-upd/install-on-device.sh /tmp/leandns-upd"
 ```
 
-IP는 장치 관리 주소에 맞게 바꿉니다.
+Replace the IP with the device management address.
 
-## PC에서 (Windows 11)
+## From PC (Windows 11)
 
 ```bat
 leandns-tool-windows-amd64.exe discover
 
 leandns-tool-windows-amd64.exe set ^
-  --token "웹에표시된토큰" ^
+  --token "token-shown-in-web-ui" ^
   --ip 192.168.34.250 ^
   --netmask 255.255.255.0 ^
   --gateway 192.168.34.1
@@ -54,32 +56,32 @@ Linux/macOS:
 ./leandns-tool-linux-amd64 set --token '...' --ip 192.168.34.250 --gateway 192.168.34.1
 ```
 
-PC는 집 메인 Wi‑Fi/유선에 연결. 방화벽이 UDP 37421 응답을 막지 않는지 확인.
+PC must be connected to the home main Wi-Fi or wired LAN. Verify that your firewall does not block UDP 37421 responses.
 
 ## Android
 
-프로젝트: [`android/leandns-tool/`](../android/leandns-tool/). PC 툴과 같은 DISCOVER / SET를 제공합니다.
+Project: [`android/leandns-tool/`](../android/leandns-tool/). Provides the same DISCOVER / SET as the PC tool.
 
-### Windows 11에서 APK 빌드
+### Build APK on Windows 11
 
-1. Android Studio 설치 후 SDK 35 준비
-2. `android\leandns-tool` 폴더를 연다
-3. **Build → Build APK(s)** 또는:
+1. Install Android Studio and prepare SDK 35
+2. Open the `android\leandns-tool` folder
+3. **Build → Build APK(s)** or:
 
 ```bat
 cd C:\path\to\LeanDNS\android\leandns-tool
 gradlew.bat assembleDebug
 ```
 
-산출물: `app\build\outputs\apk\debug\app-debug.apk`
+Output: `app\build\outputs\apk\debug\app-debug.apk`
 
-폰을 집 메인 Wi‑Fi에 연결한 뒤 앱에서 **검색** → 장치 선택 → 필요 시 토큰 입력 → **적용**.
+Connect your phone to the home main Wi-Fi, then in the app tap **Discover** → select device → enter token if required → **Apply**.
 
-## 웹 UI
+## Web UI
 
-시스템 화면에서 LAN 설정 즉시 적용, UDP 임시 변경 확정, UDP 토큰 필요 여부, 토큰 표시와 재발급을 관리합니다.
+The System screen manages immediate permanent LAN settings, confirmation of UDP temporary changes, UDP token requirements, and token display/regeneration.
 
-## 참고
+## Notes
 
-- 장치 쪽 데몬: C `cmd/leandns-discoverd/discoverd.c` → `./scripts/build-discoverd.sh` (mipsel softfloat musl).
-- Android 클라이언트: `android/leandns-tool/` (동일 프로토콜).
+- Device-side daemon: C `cmd/leandns-discoverd/discoverd.c` → `./scripts/build-discoverd.sh` (mipsel softfloat musl).
+- Android client: `android/leandns-tool/` (same protocol).

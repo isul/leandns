@@ -22,7 +22,7 @@ data class ResultDialog(
 
 data class ToolUiState(
     val busy: Boolean = false,
-    val status: String = "같은 Wi‑Fi에 연결한 뒤 장치를 검색하세요.",
+    val status: String = "",
     val statusIsError: Boolean = false,
     val devices: List<ProtocolReply.DiscoverInfo> = emptyList(),
     val rawReplies: List<String> = emptyList(),
@@ -35,8 +35,9 @@ data class ToolUiState(
 )
 
 class ToolViewModel(app: Application) : AndroidViewModel(app) {
+    private val strings = app.asStringLookup()
     private val client = LeanDnsUdpClient(app.applicationContext)
-    private val _state = MutableStateFlow(ToolUiState())
+    private val _state = MutableStateFlow(ToolUiState(status = strings.get(R.string.status_idle)))
     val state: StateFlow<ToolUiState> = _state.asStateFlow()
 
     fun onTokenChange(v: String) = _state.update { it.copy(token = v) }
@@ -47,12 +48,13 @@ class ToolViewModel(app: Application) : AndroidViewModel(app) {
     fun dismissResultDialog() = _state.update { it.copy(resultDialog = null) }
 
     fun selectDevice(info: ProtocolReply.DiscoverInfo) {
+        val name = info.name.ifBlank { strings.get(R.string.default_device_name) }
         _state.update {
             it.copy(
                 ip = info.ipAddr,
                 netmask = info.netmask.ifBlank { "255.255.255.0" },
                 gateway = info.gateway,
-                status = "${info.name.ifBlank { "LeanDNS" }} 선택됨 · ${info.uiUrl}",
+                status = strings.get(R.string.status_selected, name, info.uiUrl),
                 statusIsError = false,
                 lastSetOk = false,
             )
@@ -65,7 +67,7 @@ class ToolViewModel(app: Application) : AndroidViewModel(app) {
             _state.update {
                 it.copy(
                     busy = true,
-                    status = "UDP/${LeanDnsProtocol.PORT} DISCOVER 브로드캐스트 중…",
+                    status = strings.get(R.string.status_discovering, LeanDnsProtocol.PORT),
                     statusIsError = false,
                     lastSetOk = false,
                     resultDialog = null,
@@ -80,24 +82,19 @@ class ToolViewModel(app: Application) : AndroidViewModel(app) {
                     val raw = replies.map { it.summaryLine() }
                     if (devices.isEmpty()) {
                         val message = if (raw.isEmpty()) {
-                            """
-                                장치 응답이 없습니다.
-
-                                · 같은 공유기 Wi‑Fi/LAN인지 확인하세요.
-                                · 장비가 막 재부팅됐다면 discover 서비스가 뜰 때까지 1~2분 뒤 다시 시도하세요.
-                            """.trimIndent()
+                            strings.get(R.string.msg_discover_no_reply)
                         } else {
-                            "장치를 해석하지 못했습니다.\n\n${raw.joinToString("\n")}"
+                            strings.get(R.string.msg_could_not_parse_devices, raw.joinToString("\n"))
                         }
                         _state.update {
                             it.copy(
                                 busy = false,
                                 devices = emptyList(),
                                 rawReplies = raw,
-                                status = "장치 응답 없음",
+                                status = strings.get(R.string.status_no_device_reply),
                                 statusIsError = true,
                                 resultDialog = ResultDialog(
-                                    title = "검색 실패",
+                                    title = strings.get(R.string.dialog_discover_failed_title),
                                     message = message,
                                     isError = true,
                                 ),
@@ -109,7 +106,7 @@ class ToolViewModel(app: Application) : AndroidViewModel(app) {
                                 busy = false,
                                 devices = devices,
                                 rawReplies = raw,
-                                status = "발견 ${devices.size}대",
+                                status = strings.get(R.string.status_found_count, devices.size),
                                 statusIsError = false,
                             )
                         }
@@ -117,14 +114,14 @@ class ToolViewModel(app: Application) : AndroidViewModel(app) {
                     }
                 },
                 onFailure = { e ->
-                    val message = e.message ?: "검색 실패"
+                    val message = e.message ?: strings.get(R.string.dialog_discover_failed_title)
                     _state.update {
                         it.copy(
                             busy = false,
                             status = message,
                             statusIsError = true,
                             resultDialog = ResultDialog(
-                                title = "검색 실패",
+                                title = strings.get(R.string.dialog_discover_failed_title),
                                 message = message,
                                 isError = true,
                             ),
@@ -139,13 +136,14 @@ class ToolViewModel(app: Application) : AndroidViewModel(app) {
         if (_state.value.busy) return
         val s = _state.value
         if (s.ip.isBlank() || s.gateway.isBlank()) {
+            val message = strings.get(R.string.msg_ip_gateway_required)
             _state.update {
                 it.copy(
-                    status = "IP와 게이트웨이를 입력하세요.",
+                    status = message,
                     statusIsError = true,
                     resultDialog = ResultDialog(
-                        title = "입력 확인",
-                        message = "IP와 게이트웨이를 입력하세요.",
+                        title = strings.get(R.string.dialog_input_required_title),
+                        message = message,
                         isError = true,
                     ),
                 )
@@ -159,7 +157,7 @@ class ToolViewModel(app: Application) : AndroidViewModel(app) {
             _state.update {
                 it.copy(
                     busy = true,
-                    status = "SET → $ip / $netmask gw $gateway",
+                    status = strings.get(R.string.status_set_in_progress, ip, netmask, gateway),
                     statusIsError = false,
                     lastSetOk = false,
                     resultDialog = null,
@@ -175,32 +173,32 @@ class ToolViewModel(app: Application) : AndroidViewModel(app) {
                     val ok = replies.filterIsInstance<ProtocolReply.SetOk>()
                     val raw = replies.map { it.summaryLine() }
                     if (ok.isEmpty()) {
-                        val detail = LeanDnsProtocol.formatSetFailure(replies)
+                        val detail = LeanDnsProtocol.formatSetFailure(replies, strings)
                         _state.update {
                             it.copy(
                                 busy = false,
                                 rawReplies = raw,
-                                status = "SET 실패",
+                                status = strings.get(R.string.status_set_failed),
                                 statusIsError = true,
                                 lastSetOk = false,
                                 resultDialog = ResultDialog(
-                                    title = "SET 실패",
+                                    title = strings.get(R.string.dialog_set_failed_title),
                                     message = detail,
                                     isError = true,
                                 ),
                             )
                         }
                     } else {
-                        val message = LeanDnsProtocol.formatSetSuccess(ip)
+                        val message = LeanDnsProtocol.formatSetSuccess(ip, strings)
                         _state.update {
                             it.copy(
                                 busy = false,
                                 rawReplies = raw,
-                                status = "임시 적용됨 · 웹에서 120초 안 확정",
+                                status = strings.get(R.string.status_set_pending_confirm),
                                 statusIsError = false,
                                 lastSetOk = true,
                                 resultDialog = ResultDialog(
-                                    title = "적용 완료",
+                                    title = strings.get(R.string.dialog_set_success_title),
                                     message = message,
                                     isError = false,
                                 ),
@@ -209,7 +207,7 @@ class ToolViewModel(app: Application) : AndroidViewModel(app) {
                     }
                 },
                 onFailure = { e ->
-                    val message = e.message ?: "SET 실패"
+                    val message = e.message ?: strings.get(R.string.msg_set_failed)
                     _state.update {
                         it.copy(
                             busy = false,
@@ -217,7 +215,7 @@ class ToolViewModel(app: Application) : AndroidViewModel(app) {
                             statusIsError = true,
                             lastSetOk = false,
                             resultDialog = ResultDialog(
-                                title = "SET 실패",
+                                title = strings.get(R.string.dialog_set_failed_title),
                                 message = message,
                                 isError = true,
                             ),

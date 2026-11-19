@@ -1,14 +1,18 @@
 (function () {
   const $ = (sel) => document.querySelector(sel);
   const $$ = (sel) => Array.from(document.querySelectorAll(sel));
-  const titles = {
-    dashboard: '대시보드',
-    dns: 'DNS 설정',
-    adblock: '광고 차단',
-    lists: '허용/차단',
-    system: '시스템',
-    help: '도움말'
-  };
+  const t = (key, vars) => LeanI18n.t(key, vars);
+
+  function pageTitle(name) {
+    return ({
+      dashboard: t('nav.dashboard'),
+      dns: t('nav.dns'),
+      adblock: t('nav.adblock'),
+      lists: t('nav.lists'),
+      system: t('nav.system'),
+      help: t('nav.help')
+    })[name] || name;
+  }
 
   let hostsCache = [];
   let editingHost = null;
@@ -24,14 +28,14 @@
   const pageSize = 50;
 
   function showToast(msg, ok) {
-    const t = $('#toast');
-    t.textContent = msg;
-    t.classList.remove('hidden', 'ok', 'err', 'busy');
-    if (ok === 'busy') t.classList.add('busy');
-    else t.classList.add(ok ? 'ok' : 'err');
+    const toastEl = $('#toast');
+    toastEl.textContent = msg;
+    toastEl.classList.remove('hidden', 'ok', 'err', 'busy');
+    if (ok === 'busy') toastEl.classList.add('busy');
+    else toastEl.classList.add(ok ? 'ok' : 'err');
     clearTimeout(showToast._timer);
     if (ok !== 'busy') {
-      showToast._timer = setTimeout(() => t.classList.add('hidden'), 3500);
+      showToast._timer = setTimeout(() => toastEl.classList.add('hidden'), 3500);
     }
   }
 
@@ -45,20 +49,20 @@
   async function runBusy(ev, work) {
     const ctl = actionControl(ev);
     if (ctl) ctl.disabled = true;
-    showToast('처리중...', 'busy');
+    showToast(t('msg.busy'), 'busy');
     try {
       await work();
     } catch (e) {
-      showToast(e.message || '요청 실패', false);
+      showToast(e.message || t('msg.requestFail'), false);
     } finally {
       if (ctl) ctl.disabled = false;
-      const t = $('#toast');
-      if (t && t.classList.contains('busy')) t.classList.add('hidden');
+      const toastEl = $('#toast');
+      if (toastEl && toastEl.classList.contains('busy')) toastEl.classList.add('hidden');
     }
   }
 
   function fmtBytesKb(kb) {
-    if (kb == null || kb === 'unsupported') return '지원하지 않음';
+    if (kb == null || kb === 'unsupported') return t('msg.unsupported');
     const n = Number(kb);
     if (n > 1024) return (n / 1024).toFixed(1) + ' MB';
     return n + ' KB';
@@ -69,14 +73,14 @@
     const d = Math.floor(sec / 86400);
     const h = Math.floor((sec % 86400) / 3600);
     const m = Math.floor((sec % 3600) / 60);
-    return d + '일 ' + h + '시간 ' + m + '분';
+    return t('msg.uptime', { d, h, m });
   }
 
   function setTheme(theme) {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('leandns_theme', theme);
     $$('.theme-toggle').forEach((btn) => {
-      btn.setAttribute('aria-label', theme === 'dark' ? '라이트 테마' : '다크 테마');
+      btn.setAttribute('aria-label', t(theme === 'dark' ? 'theme.light' : 'theme.dark'));
     });
   }
 
@@ -86,7 +90,7 @@
     const backdrop = $('#drawer-backdrop');
     if (toggle) {
       toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-      toggle.setAttribute('aria-label', open ? '메뉴 닫기' : '메뉴 열기');
+      toggle.setAttribute('aria-label', t(open ? 'nav.closeMenu' : 'nav.openMenu'));
     }
     if (backdrop) backdrop.setAttribute('aria-hidden', open ? 'false' : 'true');
   }
@@ -96,7 +100,7 @@
     const el = $('#page-' + name);
     if (el) el.classList.remove('hidden');
     $$('.nav').forEach((b) => b.classList.toggle('active', b.dataset.page === name));
-    $('#page-title').textContent = titles[name] || name;
+    $('#page-title').textContent = pageTitle(name);
     currentPage = name;
     setDrawer(false);
     hideToken();
@@ -132,8 +136,8 @@
     const value = Number(s.dns_test_latency_ms);
     if (!Number.isFinite(value) || s.dns_test_latency_ms == null) return '';
     const precision = Number(s.dns_test_resolution_ms) || 1;
-    if (value === 0) return precision + ' ms 미만';
-    return (precision > 1 ? '약 ' : '') + value + ' ms';
+    if (value === 0) return t('msg.ltMs', { n: precision });
+    return precision > 1 ? t('msg.approxMs', { n: value }) : t('msg.ms', { n: value });
   }
 
   function dnsSucceeded(s) {
@@ -141,7 +145,7 @@
   }
 
   function flashScope(s) {
-    return s.flash_scope === 'overlay' ? '쓰기 가능 영역 (/overlay)' : '루트 파일시스템 (/)';
+    return s.flash_scope === 'overlay' ? t('msg.flashOverlay') : t('msg.flashRoot');
   }
 
   function enabledAdblock(a) {
@@ -150,35 +154,29 @@
 
   function countRules(a) {
     const count = Number(a.rule_count);
-    return a.rule_count != null && Number.isFinite(count) ? count.toLocaleString('ko-KR') : '—';
+    return a.rule_count != null && Number.isFinite(count) ? count.toLocaleString(LeanI18n.numberLocale) : '—';
   }
 
   function fmtCount(n) {
     const v = Number(n);
-    return Number.isFinite(v) ? v.toLocaleString('ko-KR') : '—';
+    return Number.isFinite(v) ? v.toLocaleString(LeanI18n.numberLocale) : '—';
   }
 
   function fmtAge(sec) {
     const v = Number(sec);
     if (!Number.isFinite(v) || v < 0) return '';
-    if (v < 60) return '마지막 차단 ' + v + '초 전';
-    if (v < 3600) return '마지막 차단 ' + Math.floor(v / 60) + '분 전';
-    return '마지막 차단 ' + Math.floor(v / 3600) + '시간 전';
+    if (v < 60) return t('msg.lastBlockSec', { n: v });
+    if (v < 3600) return t('msg.lastBlockMin', { n: Math.floor(v / 60) });
+    return t('msg.lastBlockHour', { n: Math.floor(v / 3600) });
   }
 
   function fmtDelta(today, yesterday) {
-    const t = Number(today);
+    const tv = Number(today);
     const y = Number(yesterday);
-    if (!Number.isFinite(t) || !Number.isFinite(y) || y <= 0) return '재부팅 후 집계';
-    const pct = Math.round(((t - y) / y) * 100);
-    if (pct === 0) return '어제와 같음';
-    return (pct > 0 ? '+' : '') + pct + '% 어제 대비';
-  }
-
-  function typeClass(label) {
-    if (label === '광고') return 'type-ad';
-    if (label === '추적') return 'type-track';
-    return 'type-block';
+    if (!Number.isFinite(tv) || !Number.isFinite(y) || y <= 0) return t('msg.sinceReboot');
+    const pct = Math.round(((tv - y) / y) * 100);
+    if (pct === 0) return t('msg.sameAsYesterday');
+    return t('msg.vsYesterday', { pct: (pct > 0 ? '+' : '') + pct });
   }
 
   function fmtLocalHm(sec) {
@@ -213,7 +211,7 @@
     if (!el) return;
     const rows = Array.isArray(trend) ? trend : [];
     if (!rows.length) {
-      el.innerHTML = '<p class="muted">추이 데이터 없음</p>';
+      el.innerHTML = '<p class="muted">' + t('msg.trendEmpty') + '</p>';
       return;
     }
     const max = Math.max(1, ...rows.map((r) => Number(r.c) || 0));
@@ -221,7 +219,7 @@
       const c = Number(r.c) || 0;
       const h = Math.max(8, Math.round((c / max) * 100));
       const label = trendLabel(r);
-      return '<div class="trend-col" title="' + label + ' · ' + c + '건">' +
+      return '<div class="trend-col" title="' + t('msg.trendTitle', { label, n: c }) + '">' +
         '<div class="trend-bar" style="height:' + h + '%"></div>' +
         '<span class="trend-val">' + c + '</span>' +
         '<span class="trend-label">' + label + '</span></div>';
@@ -234,24 +232,24 @@
     const hint = $('#st-recent-hint');
     if (!body) return;
     const limit = Number(bs && bs.recent_limit) || 20;
-    if (title) title.textContent = '최근 차단 ' + limit + '개 도메인';
+    if (title) title.textContent = t('msg.recentTitle', { n: limit });
     if (hint) {
-      hint.textContent = bs && bs.paused ? '일시 중지됨 (중요 작업 중)'
-        : (limit <= 10 ? '저메모리 · 최근 10건' : '메모리 전용');
+      hint.textContent = bs && bs.paused ? t('msg.pausedHint')
+        : (limit <= 10 ? t('msg.lowMemHint') : t('msg.memOnlyHint'));
     }
     const rows = (bs && Array.isArray(bs.recent)) ? bs.recent : [];
     if (!rows.length) {
-      body.innerHTML = '<tr><td colspan="5" class="muted">아직 차단 기록이 없습니다.</td></tr>';
+      body.innerHTML = '<tr><td colspan="5" class="muted">' + t('dash.noRecent') + '</td></tr>';
       return;
     }
     body.innerHTML = rows.map((r) => {
-      const type = r.type || '차단';
+      const type = LeanI18n.localizeType(r.type);
       const time = Number.isFinite(Number(r.ts)) ? fmtLocalHms(r.ts) : (r.time || '—');
       return '<tr>' +
         '<td>' + (r.n || '') + '</td>' +
         '<td>' + time + '</td>' +
         '<td class="domain">' + (r.domain || '—') + '</td>' +
-        '<td><span class="type-pill ' + typeClass(type) + '">' + type + '</span></td>' +
+        '<td><span class="type-pill ' + LeanI18n.typeClass(r.type) + '">' + type + '</span></td>' +
         '<td>' + (r.client || '—') + '</td>' +
         '</tr>';
     }).join('');
@@ -262,31 +260,31 @@
     const enabled = bs.enabled === true || bs.enabled === 'true';
     const paused = bs.paused === true || bs.paused === 'true';
     if (!enabled) {
-      metric('#st-block-10m', '꺼짐');
-      metric('#st-block-last', '질의 로그 비활성');
+      metric('#st-block-10m', t('msg.off'));
+      metric('#st-block-last', t('msg.queryLogOff'));
       metric('#st-block-today', '—');
       metric('#st-block-delta', '');
       metric('#st-sum-1m', '—');
       metric('#st-sum-10m', '—');
       metric('#st-sum-today', '—');
-      metric('#st-sum-state', '수집 안 함');
+      metric('#st-sum-state', t('msg.notCollecting'));
       updateBlockTrend([]);
       updateRecentBlocks({ recent_limit: 20, recent: [], paused: false });
-      metric('#st-block-trend-note', '설정에서 질의 로그를 켜면 표시됩니다.');
+      metric('#st-block-trend-note', t('msg.enableQueryLog'));
       return;
     }
-    metric('#st-block-10m', fmtCount(bs.count_10m) + '건');
-    metric('#st-block-last', fmtAge(bs.last_block_age_sec) || (bs.count_today ? '' : '아직 차단 없음'));
-    metric('#st-block-today', fmtCount(bs.count_today) + '건');
+    metric('#st-block-10m', t('msg.nBlocks', { n: fmtCount(bs.count_10m) }));
+    metric('#st-block-last', fmtAge(bs.last_block_age_sec) || (bs.count_today ? '' : t('msg.noBlocksYet')));
+    metric('#st-block-today', t('msg.nBlocks', { n: fmtCount(bs.count_today) }));
     metric('#st-block-delta', fmtDelta(bs.count_today, bs.count_yesterday), Number(bs.count_today) >= Number(bs.count_yesterday) ? 'ok' : '');
-    metric('#st-sum-1m', fmtCount(bs.count_1m) + '건');
-    metric('#st-sum-10m', fmtCount(bs.count_10m) + '건');
-    metric('#st-sum-today', fmtCount(bs.count_today) + '건');
-    metric('#st-sum-state', paused ? '일시 중지' : (Number(bs.recent_limit) <= 10 ? '저메모리 모드' : '수집 중'),
+    metric('#st-sum-1m', t('msg.nBlocks', { n: fmtCount(bs.count_1m) }));
+    metric('#st-sum-10m', t('msg.nBlocks', { n: fmtCount(bs.count_10m) }));
+    metric('#st-sum-today', t('msg.nBlocks', { n: fmtCount(bs.count_today) }));
+    metric('#st-sum-state', paused ? t('msg.paused') : (Number(bs.recent_limit) <= 10 ? t('msg.lowMemMode') : t('msg.collecting')),
       paused ? 'warn' : 'ok');
     updateBlockTrend(bs.trend);
     updateRecentBlocks(bs);
-    metric('#st-block-trend-note', '분당 차단 수 · 최근 10분');
+    metric('#st-block-trend-note', t('msg.perMinNote'));
   }
 
   function updateResourceMeter(meterId, readingId, amount, total) {
@@ -305,21 +303,21 @@
 
   function updateDashboard(s) {
     const a = s.adblock || {};
-    const dns = !s.dnsmasq_running ? ['중지됨', 'error'] : dnsSucceeded(s)
-      ? ['정상', 'ok'] : s.dns_test_ok === 'unsupported' ? ['실행 중', ''] : ['조회 실패', 'warn'];
+    const dns = !s.dnsmasq_running ? [t('msg.stopped'), 'error'] : dnsSucceeded(s)
+      ? [t('msg.ok'), 'ok'] : s.dns_test_ok === 'unsupported' ? [t('msg.running'), ''] : [t('msg.lookupFail'), 'warn'];
     metric('#st-dns', ...dns);
     metric('#st-rtt', [s.dns_test_host, dnsSucceeded(s) && fmtLatency(s)].filter(Boolean).join(' · '));
-    const adblock = a.list_state === 'updating' ? ['업데이트 중', 'warn']
-      : a.list_state === 'applied' ? ['적용됨', 'ok']
-      : !a.adblock_available ? ['미설치', 'warn']
-      : enabledAdblock(a) ? ['적용 확인 필요', 'warn'] : ['비활성', ''];
+    const adblock = a.list_state === 'updating' ? [t('msg.updating'), 'warn']
+      : a.list_state === 'applied' ? [t('msg.applied'), 'ok']
+      : !a.adblock_available ? [t('msg.notInstalled'), 'warn']
+      : enabledAdblock(a) ? [t('msg.needsCheck'), 'warn'] : [t('msg.disabled'), ''];
     metric('#st-adblock', ...adblock);
-    metric('#st-rules', a.list_state === 'applied' && countRules(a) !== '—' ? countRules(a) + '개 규칙' : '');
+    metric('#st-rules', a.list_state === 'applied' && countRules(a) !== '—' ? t('msg.nRules', { n: countRules(a) }) : '');
     updateBlockStats(s);
     const hasAvailableRam = Number.isFinite(s.mem_available_kb) && s.mem_available_kb >= 0;
     const used = hasAvailableRam ? s.mem_total_kb - s.mem_available_kb : null;
     updateResourceMeter('#st-mem-meter', '#st-mem-used', used, s.mem_total_kb);
-    metric('#st-mem-available', hasAvailableRam ? '가용 RAM ' + fmtBytesKb(s.mem_available_kb) : '');
+    metric('#st-mem-available', hasAvailableRam ? t('msg.ramAvail', { n: fmtBytesKb(s.mem_available_kb) }) : '');
     metric('#st-flash-label', 'FLASH');
     updateResourceMeter('#st-flash-meter', '#st-flash-total', s.flash_free_kb, s.flash_total_kb);
     metric('#st-flash-scope', flashScope(s));
@@ -328,7 +326,7 @@
     metric('#st-upstream', (s.upstream || []).join(', ') || '—');
     metric('#st-domain', s.internal_domain || '—');
     metric('#st-upd', fmtDate(a.last_update));
-    metric('#st-checked', '최근 확인 ' + fmtDate(new Date()));
+    metric('#st-checked', t('msg.lastChecked', { t: fmtDate(new Date()) }));
   }
 
   function versionText(s) {
@@ -373,7 +371,7 @@
       statusFailures = 0;
     } catch (e) {
       statusFailures++;
-      metric('#st-checked', '상태 조회 실패 · ' + e.message, 'error');
+      metric('#st-checked', t('msg.statusFail', { msg: e.message }), 'error');
     } finally {
       statusRequest = null;
       $('#btn-refresh-status').disabled = false;
@@ -395,7 +393,7 @@
       renderHosts();
       $('#host-submit').disabled = false;
     } catch (e) {
-      showToast('DNS 설정 로드 실패: ' + e.message, false);
+      showToast(t('msg.dnsLoadFail', { msg: e.message }), false);
     }
   }
 
@@ -405,7 +403,7 @@
     if (!hostsCache.length) {
       const row = body.insertRow().insertCell();
       row.colSpan = 3;
-      row.textContent = '등록된 내부 DNS 레코드가 없습니다.';
+      row.textContent = t('dns.noHosts');
     }
     hostsCache.forEach((row, idx) => {
       const tr = document.createElement('tr');
@@ -418,19 +416,19 @@
       const edit = document.createElement('button');
       edit.type = 'button';
       edit.className = 'secondary';
-      edit.textContent = '수정';
+      edit.textContent = t('dns.edit');
       edit.addEventListener('click', () => {
         editingHost = row.hostname;
         $('#host-name').value = row.hostname;
         $('#host-ip').value = row.ip;
-        $('#host-submit').textContent = '저장';
+        $('#host-submit').textContent = t('dns.saveHost');
         $('#host-cancel').classList.remove('hidden');
         $('#host-name').focus();
       });
       const remove = document.createElement('button');
       remove.type = 'button';
       remove.className = 'secondary';
-      remove.textContent = '삭제';
+      remove.textContent = t('dns.delete');
       remove.addEventListener('click', (ev) => {
         runBusy(ev, () => saveHosts(hostsCache.filter((_, i) => i !== idx)));
       });
@@ -443,7 +441,7 @@
   function resetHostForm() {
     editingHost = null;
     $('#host-add').reset();
-    $('#host-submit').textContent = '추가';
+    $('#host-submit').textContent = t('dns.add');
     $('#host-cancel').classList.add('hidden');
   }
 
@@ -452,11 +450,11 @@
     hostsSaving = true;
     try {
       const r = await LeanAPI.call('hosts_set', { hosts });
-      if (r.ok === false) throw new Error(r.error || '저장 실패');
+      if (r.ok === false) throw new Error(r.error || t('msg.saveFail'));
       hostsCache = hosts;
       resetHostForm();
       renderHosts();
-      showToast('내부 DNS 저장됨', true);
+      showToast(t('msg.hostsSaved'), true);
     } finally {
       hostsSaving = false;
     }
@@ -467,20 +465,20 @@
       const a = await LeanAPI.call('adblock_status');
       const enabled = enabledAdblock(a);
       $('#adblock-enabled').checked = enabled;
-      metric('#adblock-state', enabled ? '활성' : '비활성');
+      metric('#adblock-state', enabled ? t('msg.active') : t('msg.inactive'));
       metric('#adblock-engine', ({
-        ok: '정상', error: '오류', missing: '미설치', stopped: '중지됨', checking: '확인 대기'
-      })[a.engine_state] || '확인 필요', a.engine_state === 'error' ? 'error' : '');
+        ok: t('msg.ok'), error: t('msg.error'), missing: t('msg.notInstalled'), stopped: t('msg.stopped'), checking: t('msg.checking')
+      })[a.engine_state] || t('msg.needsReview'), a.engine_state === 'error' ? 'error' : '');
       metric('#adblock-list-state', ({
-        applied: '적용됨', not_applied: '미적용', updating: '업데이트 중', unknown: '확인 필요'
-      })[a.list_state] || '확인 필요', a.list_state === 'applied' ? 'ok' : 'warn');
+        applied: t('msg.applied'), not_applied: t('msg.notApplied'), updating: t('msg.updating'), unknown: t('msg.needsReview')
+      })[a.list_state] || t('msg.needsReview'), a.list_state === 'applied' ? 'ok' : 'warn');
       metric('#adblock-rules', countRules(a));
       metric('#adblock-upd', fmtDate(a.last_update));
       const messages = {
-        success: '성공', updating: '진행 중', low_ram: '실패 · 가용 RAM 부족',
-        low_tmp: '실패 · 임시 공간 부족', failed: '실패 · 시스템 로그 확인'
+        success: t('msg.success'), updating: t('msg.inProgress'), low_ram: t('msg.failLowRam'),
+        low_tmp: t('msg.failLowTmp'), failed: t('msg.failCheckLogs')
       };
-      metric('#adblock-result', messages[a.update_result] || '기록 없음');
+      metric('#adblock-result', messages[a.update_result] || t('msg.noRecord'));
       $('#btn-adblock-update').disabled = !enabled || a.list_state === 'updating';
       $('#adblock-form [type="submit"]').disabled = a.list_state === 'updating';
     } catch (e) {
@@ -511,15 +509,17 @@
     const pages = Math.max(1, Math.ceil(matches.length / pageSize));
     listPage = Math.min(listPage, pages - 1);
     const start = listPage * pageSize;
-    const range = pages > 1 ? ' · ' + (start + 1) + '–' + Math.min(start + pageSize, matches.length) : '';
-    $('#list-count').textContent = (query ? '검색 결과 ' + matches.length + ' / ' : '전체 ') + all.length + '개' + range;
+    const range = pages > 1 ? t('msg.listRange', { a: start + 1, b: Math.min(start + pageSize, matches.length) }) : '';
+    $('#list-count').textContent = (query
+      ? t('msg.listCountSearch', { m: matches.length, n: all.length })
+      : t('msg.listCountAll', { n: all.length })) + range;
     $('#list-prev').disabled = listPage === 0;
     $('#list-next').disabled = listPage >= pages - 1;
     $('#btn-lists-save').disabled = !listsDirty;
     $('#list-dirty').classList.toggle('hidden', !listsDirty);
     if (!matches.length) {
       const item = document.createElement('li');
-      item.textContent = query ? '검색 결과가 없습니다.' : '등록된 도메인이 없습니다.';
+      item.textContent = query ? t('msg.noSearch') : t('msg.noDomains');
       entries.appendChild(item);
     }
     for (const domain of matches.slice(start, start + pageSize)) {
@@ -529,8 +529,8 @@
       const remove = document.createElement('button');
       remove.type = 'button';
       remove.className = 'secondary';
-      remove.textContent = '삭제';
-      remove.setAttribute('aria-label', domain + ' 삭제');
+      remove.textContent = t('dns.delete');
+      remove.setAttribute('aria-label', t('msg.deleteAria', { domain }));
       remove.addEventListener('click', () => {
         lists[currentList] = lists[currentList].filter((d) => d !== domain);
         listsDirty = true;
@@ -548,12 +548,12 @@
     for (const raw of domains) {
       const domain = raw.toLowerCase().replace(/\.$/, '');
       if (!domain) continue;
-      if (domain.length > 253 || !valid.test(domain)) throw new Error('도메인 형식 확인: ' + raw);
+      if (domain.length > 253 || !valid.test(domain)) throw new Error(t('msg.badDomain', { raw }));
       if (!normalized.has(domain)) additions.push(domain);
       normalized.add(domain);
     }
     if (!additions.length) {
-      showToast('추가할 새 도메인이 없습니다.', false);
+      showToast(t('msg.noNewDomains'), false);
       return;
     }
     lists[currentList] = lists[currentList].concat(additions).sort();
@@ -561,26 +561,29 @@
     $('#list-search').value = '';
     listPage = 0;
     renderLists();
-    showToast(additions.length + '개 추가됨. 목록 저장을 눌러 적용하세요.', true);
+    showToast(t('msg.addedNeedSave', { n: additions.length }), true);
   }
 
   function hideToken() {
     $('#udp-token').textContent = '';
     $('#udp-token-line').classList.add('hidden');
-    $('#btn-udp-reveal').textContent = '토큰 표시';
+    $('#btn-udp-reveal').textContent = t('sys.tokenShow');
   }
 
   function revealToken(token) {
     $('#udp-token').textContent = token;
     $('#udp-token-line').classList.remove('hidden');
-    $('#btn-udp-reveal').textContent = '토큰 숨기기';
+    $('#btn-udp-reveal').textContent = t('sys.tokenHide');
   }
 
   function updateNetwork(s) {
     $('#net-ip').value = s.ipaddr || '';
     $('#net-mask').value = s.netmask || '';
     $('#net-gw').value = s.gateway || '';
-    $('#sys-net').textContent = (s.ipaddr || '—') + ' · GW ' + (s.gateway || '—');
+    const netIp = $('#sys-net-ip');
+    const netGw = $('#sys-net-gw');
+    if (netIp) netIp.textContent = s.ipaddr ? ('IP ' + s.ipaddr) : '—';
+    if (netGw) netGw.textContent = s.gateway ? ('GW ' + s.gateway) : '';
     const pending = s.pending_ip || '';
     $('#net-apply').disabled = !!pending;
     $('#net-pending').classList.toggle('hidden', !pending);
@@ -588,12 +591,12 @@
     const isNewAddress = LeanAPI.state.mode === 'mock' || location.hostname === pending;
     const ready = s.pending_state === 'ready';
     $('#net-confirm').classList.toggle('hidden', !isNewAddress || !ready);
-    const status = {
-      applying: '적용 준비 중입니다.',
-      ready: '120초 안에 새 주소에서 로그인한 뒤 변경을 확정하세요.',
-      restore_failed: '자동 복구에 실패했습니다. 시스템 로그를 확인하세요.'
+    const statusMsgs = {
+      applying: t('msg.netApplying'),
+      ready: t('msg.netReady'),
+      restore_failed: t('msg.netRestoreFail')
     };
-    metric('#net-pending-text', pending + ' · ' + (status[s.pending_state] || status.applying),
+    metric('#net-pending-text', pending + ' · ' + (statusMsgs[s.pending_state] || statusMsgs.applying),
       s.pending_state === 'restore_failed' ? 'error' : '');
     const link = $('#net-pending-link');
     const url = new URL(location.href);
@@ -605,7 +608,7 @@
 
   async function loadLogs() {
     const logs = await LeanAPI.call('logs_get', { lines: 100 });
-    $('#sys-logs').textContent = (logs.lines || []).join('\n') || '(로그 없음)';
+    $('#sys-logs').textContent = (logs.lines || []).join('\n') || t('msg.noLogs');
   }
 
   function setFirmwareUi(state) {
@@ -629,42 +632,47 @@
   async function refreshFirmwareStatus(msg) {
     const st = await LeanAPI.call('firmware_status');
     setFirmwareUi(st);
-    if (msg != null) metric('#fw-status', msg, /실패|불가|부족|factory/i.test(String(msg)) ? 'error' : (st.verified ? 'ok' : ''));
+    const infoTmp = $('#sys-info-tmp');
+    if (infoTmp && st.tmp_free_kb != null) infoTmp.textContent = fmtBytesKb(st.tmp_free_kb);
+    if (msg != null) metric('#fw-status', msg, /실패|불가|부족|factory|fail|unavailable|low|insufficient/i.test(String(msg)) ? 'error' : (st.verified ? 'ok' : ''));
     else if (st.image_present && st.verified) {
       metric('#fw-status',
-        '검사 통과 · ' + fmtBytesKb(st.image_kb) +
-        ' · 가용 RAM ' + fmtBytesKb(st.mem_available_kb) +
-        ' · /tmp ' + fmtBytesKb(st.tmp_free_kb),
+        t('msg.fwVerified', { img: fmtBytesKb(st.image_kb), ram: fmtBytesKb(st.mem_available_kb), tmp: fmtBytesKb(st.tmp_free_kb) }),
         'ok');
     } else if (st.image_present) {
       metric('#fw-status',
-        '업로드됨(미검사) · ' + fmtBytesKb(st.image_kb) +
-        ' · 가용 RAM ' + fmtBytesKb(st.mem_available_kb),
+        t('msg.fwUploaded', { img: fmtBytesKb(st.image_kb), ram: fmtBytesKb(st.mem_available_kb) }),
         'warn');
     } else {
       metric('#fw-status',
-        '대기 · 가용 RAM ' + fmtBytesKb(st.mem_available_kb) +
-        ' · /tmp ' + fmtBytesKb(st.tmp_free_kb));
+        t('msg.fwIdle', { ram: fmtBytesKb(st.mem_available_kb), tmp: fmtBytesKb(st.tmp_free_kb) }));
     }
     return st;
   }
 
   async function loadSystem() {
     try {
-      const [s, n, t] = await Promise.all([
+      const [s, n, udpTok] = await Promise.all([
         LeanAPI.call('system_info'), LeanAPI.call('network_get'), LeanAPI.call('udp_token_get')
       ]);
       setVersionLabels(s);
-      $('#sys-flash-label').textContent = flashScope(s) + ' 여유';
+      const flashLabel = t('msg.flashFreeLabel', { scope: flashScope(s) });
+      $('#sys-flash-label').textContent = flashLabel;
       $('#sys-flash').textContent = fmtBytesKb(s.flash_free_kb) + ' / ' + fmtBytesKb(s.flash_total_kb);
       $('#sys-mem').textContent = fmtBytesKb(s.mem_available_kb) + ' / ' + fmtBytesKb(s.mem_total_kb);
+      const infoRam = $('#sys-info-ram');
+      const infoFlash = $('#sys-info-flash');
+      const infoFlashLabel = $('#sys-info-flash-label');
+      if (infoRam) infoRam.textContent = fmtBytesKb(s.mem_available_kb) + ' / ' + fmtBytesKb(s.mem_total_kb);
+      if (infoFlash) infoFlash.textContent = fmtBytesKb(s.flash_free_kb) + ' / ' + fmtBytesKb(s.flash_total_kb);
+      if (infoFlashLabel) infoFlashLabel.textContent = flashLabel;
       updateNetwork(n);
-      $('#udp-token-required').checked = t.required !== false;
+      $('#udp-token-required').checked = udpTok.required !== false;
       $('#udp-token-required').disabled = false;
       try {
         await refreshFirmwareStatus();
       } catch (_) {
-        metric('#fw-status', '펌웨어 상태 조회 불가');
+        metric('#fw-status', t('msg.fwStatusFail'));
       }
       await loadLogs();
     } catch (e) {
@@ -673,6 +681,8 @@
   }
 
   async function boot() {
+    LeanI18n.apply();
+
     const theme = localStorage.getItem('leandns_theme') || 'light';
     setTheme(theme);
 
@@ -729,8 +739,8 @@
             dns_test_host: $('#dns-test-host').value.trim(),
             ipv6_dns: $('#dns-ipv6').checked
           });
-          if (r.ok === false) throw new Error(r.error || '저장 실패');
-          showToast('DNS 설정 적용됨', true);
+          if (r.ok === false) throw new Error(r.error || t('msg.saveFail'));
+          showToast(t('msg.dnsApplied'), true);
           await loadDns();
         } catch (e) {
           showToast(e.message, false);
@@ -745,12 +755,12 @@
         const host = $('#dns-test-host').value.trim();
         const result = $('#dns-result');
         result.classList.remove('hidden');
-        metric('#dns-result', host + ' 조회 중…');
+        metric('#dns-result', t('msg.dnsLooking', { host }));
         try {
           const r = await LeanAPI.call('dns_test', { host });
-          if (r.ok === false) throw new Error(r.error || '조회 실패');
+          if (r.ok === false) throw new Error(r.error || t('msg.lookupFailShort'));
           const ok = dnsSucceeded(r);
-          const status = ok ? 'DNS 조회 성공' : r.dns_test_ok === 'unsupported' ? 'DNS 조회 불가' : 'DNS 조회 실패';
+          const status = ok ? t('msg.dnsOk') : r.dns_test_ok === 'unsupported' ? t('msg.dnsUnsupported') : t('msg.dnsFail');
           metric('#dns-result', [status + ' · ' + (r.dns_test_host || host),
             (r.addresses || []).join(', '), ok && fmtLatency(r)].filter(Boolean).join('\n'), ok ? 'ok' : 'error');
         } catch (e) {
@@ -762,7 +772,7 @@
       runBusy(ev, async () => {
         try {
           await LeanAPI.call('dns_restart');
-          showToast('DNS 재시작됨', true);
+          showToast(t('msg.dnsRestarted'), true);
         } catch (e) {
           showToast(e.message, false);
         }
@@ -775,7 +785,7 @@
         const hostname = $('#host-name').value.trim();
         const ip = $('#host-ip').value.trim();
         if (hostsCache.some((h) => h.hostname !== editingHost && h.hostname.toLowerCase() === hostname.toLowerCase())) {
-          throw new Error('같은 호스트가 이미 있습니다. 목록에서 수정하세요.');
+          throw new Error(t('msg.hostExists'));
         }
         await saveHosts([...hostsCache.filter((h) => h.hostname !== editingHost), { hostname, ip }]);
       });
@@ -787,8 +797,8 @@
       runBusy(ev, async () => {
         try {
           const r = await LeanAPI.call('adblock_set', { enabled: $('#adblock-enabled').checked });
-          if (r.ok === false) throw new Error(r.error || '설정 실패');
-          showToast('광고 차단 설정 적용됨', true);
+          if (r.ok === false) throw new Error(r.error || t('msg.setFail'));
+          showToast(t('msg.adblockApplied'), true);
         } finally {
           await loadAdblock();
         }
@@ -798,11 +808,11 @@
     $('#btn-adblock-update').addEventListener('click', (ev) => {
       runBusy(ev, async () => {
         const update = LeanAPI.call('adblock_update');
-        metric('#adblock-list-state', '업데이트 요청 중', 'warn');
+        metric('#adblock-list-state', t('msg.updateRequesting'), 'warn');
         try {
           const r = await update;
-          if (r.ok === false) throw new Error(r.error || '업데이트 실패');
-          showToast(r.started === 'background' ? '업데이트 시작됨' : '목록 업데이트 완료', true);
+          if (r.ok === false) throw new Error(r.error || t('msg.updateFail'));
+          showToast(r.started === 'background' ? t('msg.updateStarted') : t('msg.updateDone'), true);
         } finally {
           await loadAdblock();
         }
@@ -840,10 +850,10 @@
         controls.disabled = true;
         try {
           const r = await LeanAPI.call('lists_set', lists);
-          if (r.ok === false) throw new Error(r.error || '저장 실패');
+          if (r.ok === false) throw new Error(r.error || t('msg.saveFail'));
           listsDirty = false;
           renderLists();
-          showToast('목록 저장됨. 광고 차단 화면에서 목록을 갱신하면 적용됩니다.', true);
+          showToast(t('msg.listsSaved'), true);
         } finally {
           controls.disabled = false;
         }
@@ -854,14 +864,14 @@
     $('#btn-logs-clear').addEventListener('click', (ev) => {
       runBusy(ev, async () => {
         await LeanAPI.call('logs_clear');
-        showToast('로그 초기화 요청됨', true);
+        showToast(t('msg.logsCleared'), true);
         await loadLogs();
       });
     });
     $('#btn-svc-restart').addEventListener('click', (ev) => {
       runBusy(ev, async () => {
         await LeanAPI.call('system_restart_services');
-        showToast('서비스 재시작됨', true);
+        showToast(t('msg.svcRestarted'), true);
       });
     });
     $('#net-form').addEventListener('submit', (ev) => {
@@ -869,21 +879,21 @@
       const ipaddr = $('#net-ip').value.trim();
       const netmask = $('#net-mask').value.trim();
       const gateway = $('#net-gw').value.trim();
-      if (!confirm(ipaddr + '에 네트워크 설정을 적용할까요?\n즉시 영구 반영되며 자동으로 되돌리지 않습니다.')) return;
+      if (!confirm(t('msg.netConfirm', { ip: ipaddr }))) return;
       runBusy(null, async () => {
         $('#net-apply').disabled = true;
         try {
           const r = await LeanAPI.call('network_set', { ipaddr, netmask, gateway });
-          if (r.ok === false) throw new Error(r.error || '네트워크 적용 실패');
+          if (r.ok === false) throw new Error(r.error || t('msg.netApplyFail'));
           updateNetwork({ ipaddr, netmask, gateway, pending_ip: '', pending_state: '' });
           if (LeanAPI.state.mode !== 'mock' && location.hostname !== ipaddr) {
             const url = new URL(location.href);
             url.hostname = ipaddr;
             url.hash = 'system';
-            showToast('적용됨 · 새 주소로 접속: ' + ipaddr, true);
+            showToast(t('msg.netAppliedGoto', { ip: ipaddr }), true);
             window.setTimeout(() => { location.href = url.href; }, 1200);
           } else {
-            showToast('네트워크 설정이 적용되었습니다', true);
+            showToast(t('msg.netApplied'), true);
             updateNetwork(await LeanAPI.call('network_get'));
           }
         } catch (e) {
@@ -898,9 +908,9 @@
     $('#net-confirm').addEventListener('click', (ev) => {
       runBusy(ev, async () => {
         const r = await LeanAPI.call('network_confirm');
-        if (r.ok === false) throw new Error(r.error || '변경 확정 실패');
+        if (r.ok === false) throw new Error(r.error || t('msg.netConfirmFail'));
         updateNetwork(await LeanAPI.call('network_get'));
-        showToast('네트워크 설정 저장됨', true);
+        showToast(t('msg.netSaved'), true);
       });
     });
     $('#udp-token-required').addEventListener('change', (ev) => {
@@ -909,9 +919,9 @@
       runBusy(ev, async () => {
         try {
           const r = await LeanAPI.call('udp_token_set', { required, enabled: true });
-          if (r.ok === false) throw new Error(r.error || '설정 실패');
+          if (r.ok === false) throw new Error(r.error || t('msg.setFail'));
           box.checked = r.required !== false;
-          showToast(required ? 'UDP IP 변경에 토큰이 필요합니다.' : '토큰 없이 UDP IP 변경을 허용했습니다.', true);
+          showToast(required ? t('msg.udpTokenOn') : t('msg.udpTokenOff'), true);
         } catch (e) {
           box.checked = !required;
           throw e;
@@ -924,106 +934,104 @@
         return;
       }
       runBusy(ev, async () => {
-        const t = await LeanAPI.call('udp_token_get', { reveal: true });
-        if (!t.token) throw new Error(t.error || '토큰 조회 실패');
-        if (currentPage === 'system') revealToken(t.token);
+        const tok = await LeanAPI.call('udp_token_get', { reveal: true });
+        if (!tok.token) throw new Error(tok.error || t('msg.tokenFail'));
+        if (currentPage === 'system') revealToken(tok.token);
       });
     });
     $('#btn-udp-regen').addEventListener('click', (ev) => {
-      if (!confirm('토큰을 재발급하면 기존 토큰을 사용할 수 없습니다. 계속할까요?')) return;
+      if (!confirm(t('msg.tokenRegenConfirm'))) return;
       runBusy(ev, async () => {
         const r = await LeanAPI.call('udp_token_regen');
-        if (r.ok === false) throw new Error(r.error || '재발급 실패');
+        if (r.ok === false) throw new Error(r.error || t('msg.regenFail'));
         hideToken();
-        showToast('UDP 토큰 재발급됨', true);
+        showToast(t('msg.tokenRegenOk'), true);
       });
     });
     $$('.copy-command').forEach((button) => button.addEventListener('click', async () => {
       const code = button.previousElementSibling;
       try {
         await navigator.clipboard.writeText(code.textContent);
-        showToast('명령어 복사됨', true);
+        showToast(t('msg.copied'), true);
       } catch (_) {
         const range = document.createRange();
         range.selectNodeContents(code);
         const selection = window.getSelection();
         selection.removeAllRanges();
         selection.addRange(range);
-        if (document.execCommand('copy')) showToast('명령어 복사됨', true);
-        else showToast('선택된 명령어를 복사하세요.', false);
+        if (document.execCommand('copy')) showToast(t('msg.copied'), true);
+        else showToast(t('msg.copyManual'), false);
       }
     }));
     $('#fw-file').addEventListener('change', () => {
       const file = $('#fw-file').files && $('#fw-file').files[0];
       $('#fw-file-label').textContent = file
         ? (file.name + ' · ' + fmtBytesKb(Math.ceil(file.size / 1024)))
-        : '선택된 파일 없음';
+        : t('sys.fwNone');
       $('#btn-fw-apply').disabled = true;
     });
 
     $('#btn-fw-upload').addEventListener('click', (ev) => {
       const file = $('#fw-file').files && $('#fw-file').files[0];
       if (!file) {
-        showToast('sysupgrade .bin 파일을 선택하세요.', false);
+        showToast(t('msg.pickSysupgrade'), false);
         return;
       }
       if (!isSysupgradeName(file.name)) {
-        showToast('factory.bin이 아닙니다. *-sysupgrade.bin 파일을 선택하세요.', false);
-        metric('#fw-status', 'factory.bin은 Firmware Restoration용입니다. sysupgrade.bin을 사용하세요.', 'error');
+        showToast(t('msg.notFactory'), false);
+        metric('#fw-status', t('msg.factoryHint'), 'error');
         return;
       }
       runBusy(ev, async () => {
-        metric('#fw-status', 'RAM 확보 및 준비 중…', 'warn');
+        metric('#fw-status', t('msg.fwPreparing'), 'warn');
         const prep = await LeanAPI.call('firmware_prepare', { size: file.size });
-        if (prep.ok === false) throw new Error(prep.error || '준비 실패');
-        metric('#fw-status', '업로드 중… 0%', 'warn');
+        if (prep.ok === false) throw new Error(prep.error || t('msg.prepFail'));
+        metric('#fw-status', t('msg.uploading', { pct: 0 }), 'warn');
         const up = await LeanAPI.uploadFirmware(file, (p) => {
-          metric('#fw-status', '업로드 중… ' + Math.round(p * 100) + '%', 'warn');
+          metric('#fw-status', t('msg.uploading', { pct: Math.round(p * 100) }), 'warn');
         });
-        if (up.ok === false) throw new Error(up.error || '업로드 실패');
-        metric('#fw-status', '이미지 검사 중…', 'warn');
+        if (up.ok === false) throw new Error(up.error || t('msg.uploadFail'));
+        metric('#fw-status', t('msg.verifying'), 'warn');
         const ver = await LeanAPI.call('firmware_verify');
         if (ver.ok === false) {
           await LeanAPI.call('firmware_abort').catch(() => {});
           $('#btn-fw-apply').disabled = true;
-          throw new Error(ver.error || '이미지 검사 실패');
+          throw new Error(ver.error || t('msg.verifyFail'));
         }
-        await refreshFirmwareStatus('검사 통과 · 업그레이드 적용을 눌러 진행하세요.');
-        showToast('펌웨어 업로드·검사 완료', true);
+        await refreshFirmwareStatus(t('msg.fwReady'));
+        showToast(t('msg.fwUploadOk'), true);
       });
     });
 
     $('#btn-fw-abort').addEventListener('click', (ev) => {
       runBusy(ev, async () => {
         const r = await LeanAPI.call('firmware_abort');
-        if (r.ok === false) throw new Error(r.error || '취소 실패');
+        if (r.ok === false) throw new Error(r.error || t('msg.abortFail'));
         $('#fw-file').value = '';
-        $('#fw-file-label').textContent = '선택된 파일 없음';
-        await refreshFirmwareStatus('업로드가 취소되었습니다.');
-        showToast('펌웨어 업로드 취소됨', true);
+        $('#fw-file-label').textContent = t('sys.fwNone');
+        await refreshFirmwareStatus(t('msg.fwAbortedStatus'));
+        showToast(t('msg.fwAborted'), true);
       });
     });
 
     $('#btn-fw-apply').addEventListener('click', (ev) => {
       const keep = $('#fw-keep').checked;
-      const warn = keep
-        ? '펌웨어를 적용하고 재부팅합니다. 설정은 유지됩니다. 전원을 유지하세요.'
-        : '펌웨어를 적용하고 재부팅합니다. 설정이 초기화됩니다. 전원을 유지하세요.';
-      if (!confirm(warn + '\n계속할까요?')) return;
+      const warn = keep ? t('msg.fwWarnKeep') : t('msg.fwWarnReset');
+      if (!confirm(warn + t('msg.continueQ'))) return;
       runBusy(ev, async () => {
-        metric('#fw-status', '업그레이드 적용 중… 재부팅까지 기다리세요.', 'warn');
+        metric('#fw-status', t('msg.fwApplying'), 'warn');
         let r;
         try {
           r = await LeanAPI.call('firmware_apply', { keep_settings: keep });
         } catch (e) {
-          await refreshFirmwareStatus(e.message || '적용 실패');
+          await refreshFirmwareStatus(e.message || t('msg.applyFail'));
           throw e;
         }
         if (r.ok === false) {
-          await refreshFirmwareStatus(r.error || '적용 실패');
-          throw new Error(r.error || '적용 실패');
+          await refreshFirmwareStatus(r.error || t('msg.applyFail'));
+          throw new Error(r.error || t('msg.applyFail'));
         }
-        showToast('업그레이드 시작됨 · 재부팅 대기', true);
+        showToast(t('msg.fwStarted'), true);
         // Require offline→online transition. Immediate ping success is still the old OS.
         let tries = 0;
         let sawDown = false;
@@ -1048,16 +1056,16 @@
               // Old session will be invalid after reboot.
               try { await LeanAPI.logout(); } catch (_) { /* ignore */ }
             }
-            metric('#fw-status', '재부팅 중… 응답 대기 (' + tries + ')', 'warn');
+            metric('#fw-status', t('msg.rebooting', { n: tries }), 'warn');
           } else if (!sawDown) {
-            metric('#fw-status', '플래시/재부팅 준비 중… 아직 이전 펌웨어가 응답 중 (' + tries + ')', 'warn');
+            metric('#fw-status', t('msg.stillOld', { n: tries }), 'warn');
           } else {
-            metric('#fw-status', '재부팅 완료 · ' + (ping.firmware || 'OK'), 'ok');
-            showToast('장치가 다시 온라인입니다. 다시 로그인하세요.', true);
+            metric('#fw-status', t('msg.rebootDone', { fw: ping.firmware || 'OK' }), 'ok');
+            showToast(t('msg.onlineAgain'), true);
             return;
           }
           if (tries > 120) {
-            metric('#fw-status', '응답 없음 · 전원 LED와 복구 절차를 확인하세요.', 'error');
+            metric('#fw-status', t('msg.noResponse'), 'error');
             return;
           }
           window.setTimeout(tick, 2000);
@@ -1070,12 +1078,16 @@
       runBusy(ev, async () => {
         try {
           const r = await LeanAPI.call('backup_export');
-          const blob = new Blob([r.data_base64 || JSON.stringify(r)], { type: 'text/plain' });
+          if (r.ok === false) throw new Error(r.error || t('msg.exportFail'));
+          const b64 = (r.data_base64 || '').trim();
+          if (!b64) throw new Error(t('msg.emptyBackup'));
+          const blob = new Blob([b64], { type: 'text/plain' });
           const a = document.createElement('a');
           a.href = URL.createObjectURL(blob);
           a.download = r.filename ? r.filename + '.b64' : 'leandns-backup.b64';
           a.click();
-          showToast('백업 내보내기 완료', true);
+          URL.revokeObjectURL(a.href);
+          showToast(t('msg.exportOk'), true);
         } catch (e) {
           showToast(e.message, false);
         }
@@ -1085,11 +1097,19 @@
       const file = ev.target.files && ev.target.files[0];
       if (!file) return;
       runBusy(ev, async () => {
-        const text = await file.text();
+        let text = (await file.text()).trim();
         try {
-          const r = await LeanAPI.call('backup_import', { data_base64: text.trim() });
-          if (r.ok === false) throw new Error(r.error || '가져오기 실패');
-          showToast('설정 가져오기 완료', true);
+          // Older broken exports saved the JSON envelope instead of raw base64.
+          if (text.startsWith('{') && text.includes('data_base64')) {
+            try {
+              const parsed = JSON.parse(text);
+              if (parsed && typeof parsed.data_base64 === 'string') text = parsed.data_base64.trim();
+            } catch (_) { /* keep raw text */ }
+          }
+          if (!text) throw new Error(t('msg.emptyFile'));
+          const r = await LeanAPI.call('backup_import', { data_base64: text });
+          if (r.ok === false) throw new Error(r.error || t('msg.importFail'));
+          showToast(t('msg.importOk'), true);
         } catch (e) {
           showToast(e.message, false);
         } finally {
@@ -1104,7 +1124,7 @@
       const label = btn ? btn.textContent : '';
       if (btn) {
         btn.disabled = true;
-        btn.textContent = '처리중...';
+        btn.textContent = t('login.busy');
       }
       $('#login-error').textContent = '';
       LeanAPI.login($('#login-user').value.trim(), $('#login-pass').value).then(async () => {
@@ -1113,7 +1133,7 @@
         } catch (_) { /* status refresh will fill version */ }
         enterApp();
       }).catch((e) => {
-        $('#login-error').textContent = '로그인 실패: ' + e.message;
+        $('#login-error').textContent = t('login.fail', { msg: e.message });
       }).finally(() => {
         if (btn) {
           btn.disabled = false;

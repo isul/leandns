@@ -1,4 +1,70 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">LeanDNS Tool</string>
+    <string name="brand_name">LeanDNS</string>
+    <string name="brand_tagline">Discover on LAN · set management IP</string>
+    <string name="brand_subtitle">Even on a different subnet, if you share the same router Wi‑Fi you can find the device and change its IP.</string>
+    <string name="protocol_footer">Protocol LEANDNS1 · UDP 37421 · same as the PC leandns-tool</string>
+
+    <string name="action_ok">OK</string>
+    <string name="action_close">Close</string>
+    <string name="action_open_web_ui">Open web UI</string>
+    <string name="action_ui">UI</string>
+    <string name="action_search">Search</string>
+    <string name="action_apply">Apply</string>
+    <string name="em_dash">—</string>
+    <string name="default_device_name">LeanDNS</string>
+
+    <string name="discover_section_title">Find devices</string>
+    <string name="label_ip">IP</string>
+    <string name="label_mask">Mask</string>
+    <string name="label_gw">GW</string>
+    <string name="label_mac">MAC</string>
+    <string name="label_version">Version</string>
+    <string name="label_set">SET</string>
+    <string name="label_token">Token</string>
+    <string name="label_reply">Reply</string>
+    <string name="set_allowed">Allowed</string>
+    <string name="set_disabled">Off</string>
+
+    <string name="token_udp_disabled">UDP IP change off</string>
+    <string name="token_not_required">Not required</string>
+    <string name="token_required">Required</string>
+    <string name="token_unknown_assume_required">Unknown (assume required)</string>
+    <string name="token_legacy_daemon">Legacy daemon · update device</string>
+
+    <string name="set_section_title">LAN settings (UDP SET)</string>
+    <string name="set_section_hint">Leave the token blank if “Token required for UDP IP change” is off in the web System screen.</string>
+    <string name="label_token_optional">Token (optional)</string>
+    <string name="label_new_lan_ip">New LAN IP</string>
+    <string name="label_subnet_mask">Subnet mask</string>
+    <string name="label_gateway">Gateway</string>
+    <string name="raw_log_title">Reply log</string>
+
+    <string name="status_idle">Connect to the same Wi‑Fi, then search for devices.</string>
+    <string name="status_selected">%1$s selected · %2$s</string>
+    <string name="status_discovering">Broadcasting UDP/%1$d DISCOVER…</string>
+    <string name="status_no_device_reply">No device reply</string>
+    <string name="status_found_count">Found %1$d device(s)</string>
+    <string name="status_set_in_progress">SET → %1$s / %2$s gateway %3$s</string>
+    <string name="status_set_failed">SET failed</string>
+    <string name="status_set_pending_confirm">Applied temporarily · confirm in web UI within 120s</string>
+
+    <string name="dialog_discover_failed_title">Search failed</string>
+    <string name="dialog_input_required_title">Check input</string>
+    <string name="dialog_set_failed_title">SET failed</string>
+    <string name="dialog_set_success_title">Applied</string>
+
+    <string name="msg_ip_gateway_required">Enter both IP and gateway.</string>
+    <string name="msg_discover_no_reply">No device replied.\n\n· Confirm you are on the same router Wi‑Fi/LAN.\n· If the device just rebooted, wait 1–2 minutes for the discover service, then try again.</string>
+    <string name="msg_could_not_parse_devices">Could not parse devices.\n\n%1$s</string>
+    <string name="msg_unknown_error">Unknown error</string>
+    <string name="msg_set_failed">SET failed</string>
+    <string name="msg_set_failed_no_detail">SET failed (no details).\nReplies: %1$s</string>
+    <string name="msg_set_no_reply">No device replied.\n\n· Confirm you are on the same router Wi‑Fi/LAN.\n· If the device just rebooted, wait 1–2 minutes and try again.\n· If the device requires a token, enter it.</string>
+    <string name="msg_set_success">Applied temporarily.\n\nAfter a few seconds open http://%1$s/leandns/ and confirm LAN settings on the System screen within 120 seconds.\nIf you do not confirm, the previous settings are restored.\n\nFurther applies are rejected until confirm or rollback.</string>
+    <string name="msg_set_hint_pending_change">\n\nConfirm the temporary settings in the web UI, or wait for automatic rollback after 120 seconds, then try again.</string>
+    <string name="msg_set_hint_disabled">\n\nAllow UDP IP change on the device web UI System screen.</string>
+    <string name="msg_set_hint_token">\n\nCheck the UDP token shown on the web System screen. If the token is off, leave the field blank.</string>
+    <string name="msg_set_hint_fields">\n\nDouble-check IP, subnet mask, and gateway.</string>
 </resources>

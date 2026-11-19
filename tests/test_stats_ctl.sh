@@ -52,8 +52,8 @@ EOF
 json="$("$WORKDIR/stats-ctl.sh" json)"
 echo "$json" | grep -q '"count_today":3' || { echo "FAIL count_today"; echo "$json"; exit 1; }
 echo "$json" | grep -q 'googleads.g.doubleclick.net' || { echo "FAIL recent domain"; echo "$json"; exit 1; }
-echo "$json" | grep -q '"type":"광고"' || { echo "FAIL type ad"; echo "$json"; exit 1; }
-echo "$json" | grep -q '"type":"추적"' || { echo "FAIL type track"; echo "$json"; exit 1; }
+echo "$json" | grep -q '"type":"ad"' || { echo "FAIL type ad"; echo "$json"; exit 1; }
+echo "$json" | grep -q '"type":"track"' || { echo "FAIL type track"; echo "$json"; exit 1; }
 echo "$json" | grep -q '192.168.0.200' || { echo "FAIL client"; echo "$json"; exit 1; }
 echo "$json" | grep -q '"m":' || { echo "FAIL trend minute epoch"; echo "$json"; exit 1; }
 echo "$json" | grep -q 'api2direct.cursor.sh' && { echo "FAIL counted AAAA NODATA"; echo "$json"; exit 1; }

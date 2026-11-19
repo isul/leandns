@@ -36,4 +36,4 @@ ssh "$HOST" '[ -x /usr/libexec/leandns/stats-ctl.sh ] && /usr/libexec/leandns/st
   echo OK: open http://'"${HOST#*@}"'/'
 
 
-echo "adblock-lean Mini is bundled; enable from Web UI (광고 차단)."
+echo "adblock-lean Mini is bundled; enable from Web UI (Ad blocking)."

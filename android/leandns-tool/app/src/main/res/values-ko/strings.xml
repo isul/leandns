@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">LeanDNS Tool</string>
+    <string name="brand_name">LeanDNS</string>
+    <string name="brand_tagline">LAN 발견 · 관리 IP 설정</string>
+    <string name="brand_subtitle">서브넷이 달라도 같은 공유기 Wi‑Fi면 장치를 찾아 IP를 바꿀 수 있습니다.</string>
+    <string name="protocol_footer">프로토콜 LEANDNS1 · UDP 37421 · PC leandns-tool과 동일</string>
+
+    <string name="action_ok">확인</string>
+    <string name="action_close">닫기</string>
+    <string name="action_open_web_ui">웹 UI 열기</string>
+    <string name="action_ui">UI</string>
+    <string name="action_search">검색</string>
+    <string name="action_apply">적용</string>
+    <string name="em_dash">—</string>
+    <string name="default_device_name">LeanDNS</string>
+
+    <string name="discover_section_title">장치 검색</string>
+    <string name="label_ip">IP</string>
+    <string name="label_mask">마스크</string>
+    <string name="label_gw">GW</string>
+    <string name="label_mac">MAC</string>
+    <string name="label_version">버전</string>
+    <string name="label_set">SET</string>
+    <string name="label_token">토큰</string>
+    <string name="label_reply">응답</string>
+    <string name="set_allowed">허용</string>
+    <string name="set_disabled">끔</string>
+
+    <string name="token_udp_disabled">UDP IP 변경 끔</string>
+    <string name="token_not_required">불필요</string>
+    <string name="token_required">필요</string>
+    <string name="token_unknown_assume_required">알 수 없음 (필요 가정)</string>
+    <string name="token_legacy_daemon">구버전 데몬 · 장치 업데이트 필요</string>
+
+    <string name="set_section_title">LAN 설정 (UDP SET)</string>
+    <string name="set_section_hint">웹 시스템 화면의 「UDP IP 변경에 토큰 필요」가 꺼져 있으면 토큰을 비워 두세요.</string>
+    <string name="label_token_optional">토큰 (선택)</string>
+    <string name="label_new_lan_ip">새 LAN IP</string>
+    <string name="label_subnet_mask">서브넷 마스크</string>
+    <string name="label_gateway">게이트웨이</string>
+    <string name="raw_log_title">응답 로그</string>
+
+    <string name="status_idle">같은 Wi‑Fi에 연결한 뒤 장치를 검색하세요.</string>
+    <string name="status_selected">%1$s 선택됨 · %2$s</string>
+    <string name="status_discovering">UDP/%1$d DISCOVER 브로드캐스트 중…</string>
+    <string name="status_no_device_reply">장치 응답 없음</string>
+    <string name="status_found_count">발견 %1$d대</string>
+    <string name="status_set_in_progress">SET → %1$s / %2$s 게이트웨이 %3$s</string>
+    <string name="status_set_failed">SET 실패</string>
+    <string name="status_set_pending_confirm">임시 적용됨 · 웹에서 120초 안 확정</string>
+
+    <string name="dialog_discover_failed_title">검색 실패</string>
+    <string name="dialog_input_required_title">입력 확인</string>
+    <string name="dialog_set_failed_title">SET 실패</string>
+    <string name="dialog_set_success_title">적용 완료</string>
+
+    <string name="msg_ip_gateway_required">IP와 게이트웨이를 입력하세요.</string>
+    <string name="msg_discover_no_reply">장치 응답이 없습니다.\n\n· 같은 공유기 Wi‑Fi/LAN인지 확인하세요.\n· 장비가 막 재부팅됐다면 discover 서비스가 뜰 때까지 1~2분 뒤 다시 시도하세요.</string>
+    <string name="msg_could_not_parse_devices">장치를 해석하지 못했습니다.\n\n%1$s</string>
+    <string name="msg_unknown_error">알 수 없는 오류</string>
+    <string name="msg_set_failed">SET 실패</string>
+    <string name="msg_set_failed_no_detail">SET 실패 (상세 응답 없음).\n응답: %1$s</string>
+    <string name="msg_set_no_reply">장치 응답이 없습니다.\n\n· 같은 공유기 Wi‑Fi/LAN인지 확인하세요.\n· 장비가 막 재부팅됐다면 1~2분 뒤 다시 시도하세요.\n· 토큰이 필요한 장치면 토큰을 입력하세요.</string>
+    <string name="msg_set_success">임시 적용되었습니다.\n\n수 초 후 http://%1$s/leandns/ 로 접속해 시스템 화면에서 120초 안에 LAN 설정을 확정하세요.\n확정하지 않으면 이전 설정으로 복구됩니다.\n\n확정·복구 전에는 추가 적용이 거부됩니다.</string>
+    <string name="msg_set_hint_pending_change">\n\n웹 UI에서 임시 설정을 확정하거나, 120초 후 자동 복구될 때까지 기다린 뒤 다시 시도하세요.</string>
+    <string name="msg_set_hint_disabled">\n\n장치 웹 UI 시스템 화면에서 UDP IP 변경을 허용하세요.</string>
+    <string name="msg_set_hint_token">\n\n웹 시스템 화면에 표시된 UDP 토큰을 확인하세요. 토큰이 꺼져 있으면 입력란을 비우세요.</string>
+    <string name="msg_set_hint_fields">\n\nIP · 서브넷 마스크 · 게이트웨이를 다시 확인하세요.</string>
+</resources>

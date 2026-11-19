@@ -1,23 +1,25 @@
-# LeanDNS 크기·리소스 측정
+English | [한국어](ko/metrics.md)
 
-측정일(호스트): 2026-11-18T21:14:00+09:00
-호스트: Linux 6.8.0-149-generic x86_64
+# LeanDNS Size & Resource Measurements
 
-## 호스트에서 실측됨
+Measured (host): 2026-11-19T13:19:10+09:00  
+Host: Linux 6.8.0-149-generic x86_64
 
-| 항목 | 값 |
-|------|-----|
-| 웹 UI (`web/`) | ~101 KiB |
-| `leandns-discoverd` (C static softfloat) | ~88 KiB |
-| sysupgrade 이미지 (A/B/C 적용 후) | ~3.7 MiB (이전 Wi‑Fi 제거본 ~4.2 MiB) |
+## Measured on host
 
-## 실기에서만 측정 가능 (미측정)
+| Item | Value |
+|------|-------|
+| Web UI (`web/`) | 157408 bytes |
+| Package files tree | 587600 bytes |
+| Firmware image | 3.7M /media/isul/zorin-dev/ISUL/LeanDNS/firmware/bin/leandns-1.0.0-sysupgrade.bin |
 
-| 항목 | 상태 |
-|------|------|
-| DNS/관리 프로세스 RSS | 측정 불가 (실기 필요) |
-| 차단목록 업데이트 peak RAM | 측정 불가 (실기 필요) |
-| 부팅 후 가용 RAM | 측정 불가 (실기 필요) |
-| Flash overlay 여유 | 측정 불가 (실기 필요) |
+## Device-only (not yet measured)
 
-임의로 목표 달성을 표시하지 않는다. RT-AC750L 검증 전까지 실기 항목은 미완료로 둔다.
+| Item | Status |
+|------|--------|
+| DNS/management process RSS | Not measured (needs device) |
+| Blocklist update peak RAM | Not measured (needs device) |
+| Available RAM after boot | Not measured (needs device) |
+| Flash overlay free space | Not measured (needs device) |
+
+Do not mark targets as met without measurements. Device items stay incomplete until RT-AC750L verification.

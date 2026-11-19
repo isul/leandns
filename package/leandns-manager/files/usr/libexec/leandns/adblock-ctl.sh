@@ -253,7 +253,7 @@ cmd_status() {
 start_update() {
 	action="$1"
 	mkdir "$UPDATE_LOCK" 2>/dev/null || {
-		echo '{"ok":false,"error":"목록 작업이 진행 중입니다."}'
+		echo '{"ok":false,"error":"A list operation is already in progress."}'
 		return
 	}
 	if ! check_resources; then
@@ -261,7 +261,7 @@ start_update() {
 			sed 's/^error://' "$STATUS_FILE" > "$UPDATE_FILE"
 		fi
 		rmdir "$UPDATE_LOCK"
-		echo '{"ok":false,"error":"업데이트에 필요한 RAM 또는 임시 공간이 부족합니다."}'
+		echo '{"ok":false,"error":"Not enough RAM or temporary space for update."}'
 		return
 	fi
 	if [ "$action" = enable ] && ! (
@@ -270,7 +270,7 @@ start_update() {
 		uci -q commit leandns
 	); then
 		rmdir "$UPDATE_LOCK"
-		echo '{"ok":false,"error":"광고 차단 활성화 실패"}'
+		echo '{"ok":false,"error":"Failed to enable ad blocking"}'
 		return
 	fi
 	write_status updating
@@ -302,7 +302,7 @@ cmd_enable() {
 
 cmd_disable() {
 	mkdir "$UPDATE_LOCK" 2>/dev/null || {
-		echo '{"ok":false,"error":"목록 작업이 진행 중입니다."}'
+		echo '{"ok":false,"error":"A list operation is already in progress."}'
 		return
 	}
 	trap 'rmdir "$UPDATE_LOCK"' EXIT
@@ -318,7 +318,7 @@ cmd_disable() {
 
 cmd_update() {
 	if ! abl_available || [ "$(uci -q get leandns.main.enabled || echo 0)" != 1 ]; then
-		echo '{"ok":false,"error":"광고 차단을 먼저 활성화하세요."}'
+		echo '{"ok":false,"error":"Enable ad blocking first."}'
 		return
 	fi
 	start_update update

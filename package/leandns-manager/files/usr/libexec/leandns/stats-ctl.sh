@@ -340,9 +340,9 @@ hms_from_ts() {
 
 type_label() {
 	case "$1" in
-		ad) echo 광고 ;;
-		track) echo 추적 ;;
-		*) echo 차단 ;;
+		ad) echo ad ;;
+		track) echo track ;;
+		*) echo block ;;
 	esac
 }
 

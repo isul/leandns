@@ -294,6 +294,7 @@ label.check {
   grid-template-columns: auto 1fr;
   align-items: center;
   gap: 0.5rem;
+  margin: 0.5rem 0;
 }
 input, textarea, select {
   font: inherit;
@@ -433,6 +434,63 @@ th, td {
   margin-bottom: 0.75rem;
 }
 .panel-head h3 { margin: 0; }
+.panel-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 1rem;
+  font-size: 1rem;
+}
+.panel-head .panel-title { margin: 0; }
+.panel-title .icon {
+  width: 1.15rem;
+  height: 1.15rem;
+  color: var(--accent);
+}
+.form-net { max-width: none; }
+.form-net-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+.form-fw { max-width: none; }
+.file-btn-wide {
+  width: 100%;
+  justify-content: center;
+  min-height: 2.75rem;
+}
+.sys-fw-split {
+  grid-template-columns: minmax(0, 1.2fr) minmax(220px, 0.8fr);
+  align-items: stretch;
+}
+.sys-info-box {
+  background: color-mix(in srgb, var(--accent-soft) 70%, var(--panel));
+  border-color: color-mix(in srgb, var(--accent) 22%, var(--border));
+}
+.sys-info-box .facts {
+  margin: 0.25rem 0 0.75rem;
+}
+.sys-info-note {
+  margin: 0 !important;
+  font-size: 0.85rem;
+}
+.sys-pending {
+  margin-top: 0.85rem;
+  padding: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--bg) 65%, var(--panel));
+}
+.udp-token-line {
+  margin: 0.35rem 0 0.5rem;
+}
+.sys-maint-actions {
+  margin-top: 0.85rem;
+}
+#page-system .logs {
+  min-height: 180px;
+  background: color-mix(in srgb, var(--bg) 40%, var(--panel));
+}
 .block-trend {
   display: grid;
   grid-template-columns: repeat(10, minmax(0, 1fr));
@@ -495,7 +553,7 @@ th, td {
 .facts { margin: 0; }
 .facts div {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.0fr);
   gap: 0.75rem;
   padding: 0.65rem 0;
   border-top: 1px solid var(--border);
@@ -764,7 +822,9 @@ button:disabled { cursor: default; }
   }
   .top { display: none; }
   .form.inline,
-  .split {
+  .split,
+  .sys-fw-split,
+  .form-net-grid {
     grid-template-columns: 1fr;
   }
   .overview-4 {
@@ -798,6 +858,10 @@ button:disabled { cursor: default; }
   }
   #page-system .row { display: grid; grid-template-columns: 1fr; }
   #page-system label.check { align-items: flex-start; }
+  #page-system .sys-maint-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 430px) {

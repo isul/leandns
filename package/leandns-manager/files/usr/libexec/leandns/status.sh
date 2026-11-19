@@ -11,7 +11,7 @@ dns_probe() {
 		*[!A-Za-z0-9.-]*) dns_host= ;;
 	esac
 	if ! /usr/bin/leandns-validate domain "$dns_host"; then
-		echo '{"ok":false,"error":"도메인 형식을 확인하세요."}'
+		echo '{"ok":false,"error":"Check the domain format."}'
 		return
 	fi
 	dns_ok=unsupported

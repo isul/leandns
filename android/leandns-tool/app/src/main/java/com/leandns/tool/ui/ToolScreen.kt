@@ -6,6 +6,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -40,18 +41,23 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.leandns.tool.R
 import com.leandns.tool.ResultDialog
 import com.leandns.tool.ToolUiState
 import com.leandns.tool.ToolViewModel
+import com.leandns.tool.asStringLookup
 import com.leandns.tool.udp.ProtocolReply
 
 @Composable
@@ -120,7 +126,7 @@ fun ToolScreen(
             }
 
             Text(
-                text = "프로토콜 LEANDNS1 · UDP 37421 · PC leandns-tool과 동일",
+                text = stringResource(R.string.protocol_footer),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -173,18 +179,18 @@ private fun ResultAlertDialog(
         confirmButton = {
             if (onOpenUi != null) {
                 TextButton(onClick = onOpenUi) {
-                    Text("웹 UI 열기")
+                    Text(stringResource(R.string.action_open_web_ui))
                 }
             } else {
                 TextButton(onClick = onDismiss) {
-                    Text("확인")
+                    Text(stringResource(R.string.action_ok))
                 }
             }
         },
         dismissButton = if (onOpenUi != null) {
             {
                 TextButton(onClick = onDismiss) {
-                    Text("닫기")
+                    Text(stringResource(R.string.action_close))
                 }
             }
         } else {
@@ -196,18 +202,31 @@ private fun ResultAlertDialog(
 @Composable
 private fun BrandHeader() {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Image(
+                // Use PNG drawable — mipmap adaptive-icon XML crashes painterResource.
+                painter = painterResource(id = R.drawable.ic_launcher_foreground),
+                contentDescription = stringResource(R.string.brand_name),
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(10.dp)),
+            )
+            Text(
+                text = stringResource(R.string.brand_name),
+                style = MaterialTheme.typography.displayLarge,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
         Text(
-            text = "LeanDNS",
-            style = MaterialTheme.typography.displayLarge,
-            color = MaterialTheme.colorScheme.primary,
-        )
-        Text(
-            text = "LAN 발견 · 관리 IP 설정",
+            text = stringResource(R.string.brand_tagline),
             style = MaterialTheme.typography.headlineMedium,
             color = MaterialTheme.colorScheme.onBackground,
         )
         Text(
-            text = "서브넷이 달라도 같은 공유기 Wi‑Fi면 장치를 찾아 IP를 바꿀 수 있습니다.",
+            text = stringResource(R.string.brand_subtitle),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -260,11 +279,11 @@ private fun DiscoverSection(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("장치 검색", style = MaterialTheme.typography.titleLarge)
+            Text(stringResource(R.string.discover_section_title), style = MaterialTheme.typography.titleLarge)
             Button(onClick = onDiscover, enabled = !busy) {
                 Icon(Icons.Default.Radar, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.size(8.dp))
-                Text("검색")
+                Text(stringResource(R.string.action_search))
             }
         }
 
@@ -288,6 +307,15 @@ private fun DeviceRow(
     onSelect: (ProtocolReply.DiscoverInfo) -> Unit,
     onOpenUi: (String) -> Unit,
 ) {
+    val context = LocalContext.current
+    val strings = remember(context) { context.asStringLookup() }
+    val emDash = stringResource(R.string.em_dash)
+    val defaultName = stringResource(R.string.default_device_name)
+    val setLabel = when (device.setEnabled) {
+        true -> stringResource(R.string.set_allowed)
+        false -> stringResource(R.string.set_disabled)
+        null -> emDash
+    }
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -299,35 +327,29 @@ private fun DeviceRow(
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Text(
-            text = device.name.ifBlank { "LeanDNS" },
+            text = device.name.ifBlank { defaultName },
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.primary,
         )
-        Fact("IP", device.ipAddr)
-        Fact("마스크", device.netmask)
-        Fact("GW", device.gateway)
-        Fact("MAC", device.mac)
-        Fact("버전", device.version)
-        Fact(
-            "SET",
-            when (device.setEnabled) {
-                true -> "허용"
-                false -> "끔"
-                null -> "—"
-            },
-        )
-        Fact("토큰", device.tokenLabel)
-        Fact("응답", device.from)
+        Fact(stringResource(R.string.label_ip), device.ipAddr)
+        Fact(stringResource(R.string.label_mask), device.netmask)
+        Fact(stringResource(R.string.label_gw), device.gateway)
+        Fact(stringResource(R.string.label_mac), device.mac)
+        Fact(stringResource(R.string.label_version), device.version)
+        Fact(stringResource(R.string.label_set), setLabel)
+        Fact(stringResource(R.string.label_token), device.tokenLabel(strings))
+        Fact(stringResource(R.string.label_reply), device.from)
         OutlinedButton(onClick = { onOpenUi(device.uiUrl) }) {
             Icon(Icons.Default.OpenInBrowser, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.size(8.dp))
-            Text("웹 UI 열기")
+            Text(stringResource(R.string.action_open_web_ui))
         }
     }
 }
 
 @Composable
 private fun Fact(label: String, value: String) {
+    val emDash = stringResource(R.string.em_dash)
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(
             text = label,
@@ -336,7 +358,7 @@ private fun Fact(label: String, value: String) {
             modifier = Modifier.width(56.dp),
         )
         Text(
-            text = value.ifBlank { "—" },
+            text = value.ifBlank { emDash },
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurface,
         )
@@ -366,9 +388,9 @@ private fun SetSection(
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Text("LAN 설정 (UDP SET)", style = MaterialTheme.typography.titleLarge)
+        Text(stringResource(R.string.set_section_title), style = MaterialTheme.typography.titleLarge)
         Text(
-            text = "웹 시스템 화면의 「UDP IP 변경에 토큰 필요」가 꺼져 있으면 토큰을 비워 두세요.",
+            text = stringResource(R.string.set_section_hint),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -376,7 +398,7 @@ private fun SetSection(
             value = state.token,
             onValueChange = onToken,
             modifier = Modifier.fillMaxWidth(),
-            label = { Text("토큰 (선택)") },
+            label = { Text(stringResource(R.string.label_token_optional)) },
             singleLine = true,
             visualTransformation = PasswordVisualTransformation(),
             colors = fieldColors,
@@ -385,7 +407,7 @@ private fun SetSection(
             value = state.ip,
             onValueChange = onIp,
             modifier = Modifier.fillMaxWidth(),
-            label = { Text("새 LAN IP") },
+            label = { Text(stringResource(R.string.label_new_lan_ip)) },
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
             colors = fieldColors,
@@ -394,7 +416,7 @@ private fun SetSection(
             value = state.netmask,
             onValueChange = onNetmask,
             modifier = Modifier.fillMaxWidth(),
-            label = { Text("서브넷 마스크") },
+            label = { Text(stringResource(R.string.label_subnet_mask)) },
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
             colors = fieldColors,
@@ -403,7 +425,7 @@ private fun SetSection(
             value = state.gateway,
             onValueChange = onGateway,
             modifier = Modifier.fillMaxWidth(),
-            label = { Text("게이트웨이") },
+            label = { Text(stringResource(R.string.label_gateway)) },
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
             colors = fieldColors,
@@ -412,12 +434,12 @@ private fun SetSection(
             Button(onClick = onApply, enabled = !state.busy) {
                 Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.size(8.dp))
-                Text("적용")
+                Text(stringResource(R.string.action_apply))
             }
             OutlinedButton(onClick = onOpenUi, enabled = state.ip.isNotBlank()) {
                 Icon(Icons.Default.OpenInBrowser, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.size(8.dp))
-                Text("UI")
+                Text(stringResource(R.string.action_ui))
             }
         }
     }
@@ -433,7 +455,7 @@ private fun RawLog(lines: List<String>) {
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Text("응답 로그", style = MaterialTheme.typography.titleMedium)
+        Text(stringResource(R.string.raw_log_title), style = MaterialTheme.typography.titleMedium)
         lines.forEach { line ->
             Text(line, style = MaterialTheme.typography.labelLarge)
         }

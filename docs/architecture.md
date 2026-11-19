@@ -1,10 +1,12 @@
-# LeanDNS 아키텍처
+English | [한국어](ko/architecture.md)
 
-## 목표
+# LeanDNS Architecture
 
-ASUS RT-AC750L(OpenWrt `asus_rt-ac1200-v2`)에서 AdGuard Home보다 가벼운 DNS 전용 광고 차단 관리 시스템을 제공한다. DNS 엔진은 새로 만들지 않고 dnsmasq와 adblock-lean을 사용한다.
+## Goal
 
-## 구성 요소
+Provide a DNS-only ad-blocking management system lighter than AdGuard Home on the ASUS RT-AC750L (OpenWrt `asus_rt-ac1200-v2`). Uses dnsmasq and adblock-lean without reimplementing a DNS engine.
+
+## Components
 
 ```text
 LAN Client ──DNS:53──► dnsmasq ◄── blocklist ── adblock-lean
@@ -19,50 +21,50 @@ Admin Browser ──HTTP──► uhttpd ── / and /leandns/ (same static UI)
                                                     └── procd services
 ```
 
-## 설계 결정
+## Design Decisions
 
-| 결정 | 내용 |
-|------|------|
+| Decision | Detail |
+|----------|--------|
 | OS | OpenWrt 24.10.x |
-| DNS | dnsmasq (UDP/TCP, 캐시) |
-| 차단 | adblock-lean Mini |
-| 웹 | uhttpd + 정적 UI |
+| DNS | dnsmasq (UDP/TCP, cache) |
+| Blocking | adblock-lean Mini |
+| Web | uhttpd + static UI |
 | API | rpcd/ubus + ucode |
-| 인증 | rpcd ubus `session` (LuCI UI / luci-base 미포함) |
-| DoH/DoT | 1차 제외 |
-| 역할 | DNS 전용 LAN 어플라이언스 (DHCP/라우팅 비목표) |
-| 방화벽 | firewall4/nft 스택 제외 (메인 공유기 뒤 LAN 전제) |
+| Auth | rpcd ubus `session` (no LuCI UI / luci-base) |
+| DoH/DoT | Excluded in first version |
+| Role | DNS-only LAN appliance (no DHCP/routing) |
+| Firewall | firewall4/nft stack excluded (assumed behind main router on LAN) |
 
-## 네트워크 기본값
+## Network Defaults
 
-| 항목 | 기본값 |
-|------|--------|
-| 관리 IP | 192.168.0.250/24 |
+| Item | Default |
+|------|---------|
+| Management IP | 192.168.0.250/24 |
 | Gateway | 192.168.0.1 |
-| DHCP 서버 | 비활성 |
+| DHCP server | Disabled |
 | DNS | TCP/UDP 53 |
-| UI | LAN만 |
-| 내부 도메인 | home.arpa |
+| UI | LAN only |
+| Internal domain | home.arpa |
 
-메인 공유기가 DHCP를 담당하고, LeanDNS는 DNS만 처리한다. 설치 시 메인 공유기 DNS를 자동 변경하지 않는다.
+The main router handles DHCP; LeanDNS handles DNS only. The main router's DNS setting is not changed automatically during installation.
 
-## 설정 저장
+## Configuration Storage
 
-- `leandns` UCI: 관리 옵션, 캐시, IPv6 토글, 질의 로그 옵션
-- `dhcp` UCI: dnsmasq upstream, 캐시 크기, 도메인
-- `/etc/leandns/hosts` 또는 UCI host 섹션: 내부 정적 레코드
-- `/etc/adblock-lean/config`: 차단 프리셋
-- 커스텀 allow/block: adblock-lean 사용자 목록 경로
+- `leandns` UCI: management options, cache, IPv6 toggle, query log options
+- `dhcp` UCI: dnsmasq upstream, cache size, domain
+- `/etc/leandns/hosts` or UCI host section: internal static records
+- `/etc/adblock-lean/config`: Mini preset (`hagezi:pro.mini`)
+- `/etc/leandns/allow.list`, `/etc/leandns/block.list`: custom allow/block
 
-## 안전한 적용
+## Safe Apply
 
-1. 변경 전 관련 UCI/파일을 백업한다.
-2. 검증(도메인·IP·숫자 범위) 통과 후에만 커밋한다.
-3. 서비스 재시작 실패 시 백업을 복구하고 서비스를 재기동한다.
-4. 임의 셸 명령 실행 API는 제공하지 않는다.
+1. Back up relevant UCI/files before making changes.
+2. Commit only after validation (domain, IP, numeric range) passes.
+3. On service restart failure, restore backup and restart service.
+4. No arbitrary shell execution API is provided.
 
-## 통계 정책
+## Statistics Policy
 
-실측 가능한 값만 표시한다. 캐시 적중률·클라이언트별 사용량은 엔진에서 제공되지 않으면 UI에 “지원하지 않음”으로 표시한다.
+Only measurable values are displayed. Cache hit rate and per-client usage are shown as "not supported" in the UI if the engine does not provide them.
 
-차단 통계(`block_stats`)는 dnsmasq 질의 로그를 `/tmp`에서만 파싱해 **RAM 전용**으로 유지한다(재부팅 시 소멸, Flash 미기록). 최근 차단은 기본 20건, 가용 RAM이 `min_free_ram_kb`에 가까우면 10건으로 줄이고, 그보다 낮으면 수집을 일시 중지한다. adblock 목록 업데이트·DNS 재적용·패키지 설치 직전에는 pause/truncate로 tmpfs를 비운다.
+Block statistics (`block_stats`) are maintained **RAM-only** by parsing dnsmasq query logs from `/tmp` (cleared on reboot, never written to Flash). Recent blocks default to 20 entries; reduced to 10 when available RAM approaches `min_free_ram_kb`, and collection is paused when RAM drops below that threshold. tmpfs is cleared via pause/truncate immediately before adblock list updates, DNS re-apply, and package installation.

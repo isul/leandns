@@ -7,7 +7,9 @@
     username: localStorage.getItem('leandns_user') || 'root'
   };
 
-  function toastCapable() {}
+  function t(key, vars) {
+    return (global.LeanI18n && global.LeanI18n.t) ? global.LeanI18n.t(key, vars) : key;
+  }
 
   async function ubusCall(object, method, params, session) {
     const sid = session || state.session || '00000000000000000000000000000000';
@@ -29,8 +31,8 @@
     } catch (_) {
       throw new Error(
         res.status === 404
-          ? 'ubus 엔드포인트 없음(uhttpd-mod-ubus 설치 필요)'
-          : ('ubus 응답이 JSON이 아님: ' + text.slice(0, 80))
+          ? t('api.noUbus')
+          : t('api.badJson', { text: text.slice(0, 80) })
       );
     }
     if (data.error) throw new Error(data.error.message || 'ubus error');
@@ -96,16 +98,16 @@
   }
 
   async function uploadFirmware(file, onProgress) {
-    if (!file) throw new Error('파일이 없습니다.');
+    if (!file) throw new Error(t('api.noFile'));
     if (state.mode === 'mock') {
       if (onProgress) onProgress(0.3);
       const data = await mockCall('firmware_upload', { size: file.size, name: file.name });
       if (onProgress) onProgress(1);
-      if (data.error || data.ok === false) throw new Error(data.error || '업로드 실패');
+      if (data.error || data.ok === false) throw new Error(data.error || t('msg.uploadFail'));
       return data;
     }
     const sid = state.session;
-    if (!sid) throw new Error('로그인이 필요합니다.');
+    if (!sid) throw new Error(t('api.needLogin'));
     return await new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       xhr.open('POST', '/cgi-bin/leandns-fw-upload?session=' + encodeURIComponent(sid));
@@ -114,17 +116,17 @@
       xhr.upload.onprogress = (ev) => {
         if (onProgress && ev.lengthComputable && ev.total > 0) onProgress(ev.loaded / ev.total);
       };
-      xhr.onerror = () => reject(new Error('업로드 네트워크 오류'));
+      xhr.onerror = () => reject(new Error(t('api.uploadNet')));
       xhr.onload = () => {
         let data;
         try {
           data = JSON.parse(xhr.responseText || '{}');
         } catch (_) {
-          reject(new Error('업로드 응답이 JSON이 아닙니다.'));
+          reject(new Error(t('api.uploadBadJson')));
           return;
         }
         if (xhr.status >= 400 || data.ok === false) {
-          reject(new Error((data && data.error) || ('업로드 실패 (' + xhr.status + ')')));
+          reject(new Error((data && data.error) || t('api.uploadFail', { status: xhr.status })));
           return;
         }
         if (onProgress) onProgress(1);

@@ -4,6 +4,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 METRICS="$ROOT/docs/metrics.md"
+METRICS_KO="$ROOT/docs/ko/metrics.md"
 "$ROOT/scripts/package.sh" >/dev/null
 
 web_b="$(du -sb "$ROOT/web" | awk '{print $1}')"
@@ -17,11 +18,45 @@ elif compgen -G "$ROOT/firmware/openwrt-*-sysupgrade.bin" >/dev/null; then
   fw_note="$(du -h "$ROOT/firmware"/openwrt-*-sysupgrade.bin | awk '{print $1, $2}')"
 fi
 
+stamp="$(date -Iseconds)"
+host="$(uname -srm)"
+mkdir -p "$(dirname "$METRICS_KO")"
+
 cat > "$METRICS" <<EOF
+English | [한국어](ko/metrics.md)
+
+# LeanDNS Size & Resource Measurements
+
+Measured (host): ${stamp}  
+Host: ${host}
+
+## Measured on host
+
+| Item | Value |
+|------|-------|
+| Web UI (\`web/\`) | ${web_b} bytes |
+| Package files tree | ${pkg_b} bytes |
+| Firmware image | ${fw_note} |
+
+## Device-only (not yet measured)
+
+| Item | Status |
+|------|--------|
+| DNS/management process RSS | Not measured (needs device) |
+| Blocklist update peak RAM | Not measured (needs device) |
+| Available RAM after boot | Not measured (needs device) |
+| Flash overlay free space | Not measured (needs device) |
+
+Do not mark targets as met without measurements. Device items stay incomplete until RT-AC750L verification.
+EOF
+
+cat > "$METRICS_KO" <<EOF
+[English](../metrics.md) | 한국어
+
 # LeanDNS 크기·리소스 측정
 
-측정일(호스트): $(date -Iseconds)
-호스트: $(uname -srm)
+측정일(호스트): ${stamp}  
+호스트: ${host}
 
 ## 호스트에서 실측됨
 
@@ -44,4 +79,5 @@ cat > "$METRICS" <<EOF
 EOF
 
 echo "Wrote $METRICS"
+echo "Wrote $METRICS_KO"
 cat "$METRICS"

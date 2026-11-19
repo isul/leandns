@@ -1,5 +1,7 @@
 package com.leandns.tool.udp
 
+import com.leandns.tool.R
+import com.leandns.tool.StringLookup
 import org.json.JSONObject
 
 /** Same wire protocol as cmd/leandns-tool (LEANDNS1 / UDP 37421). */
@@ -18,7 +20,7 @@ object LeanDnsProtocol {
         return "$MAGIC|SET|$body"
     }
 
-    fun parseReply(from: String, text: String): ProtocolReply {
+    fun parseReply(from: String, text: String, strings: StringLookup): ProtocolReply {
         val parts = text.split("|", limit = 3)
         if (parts.size < 2 || parts[0] != MAGIC) {
             return ProtocolReply.Raw(from, text)
@@ -33,16 +35,16 @@ object LeanDnsProtocol {
             "SET_ERR" -> ProtocolReply.SetErr(
                 from = from,
                 detail = parts.getOrNull(2).orEmpty(),
-                message = extractErrorMessage(parts.getOrNull(2).orEmpty()),
+                message = extractErrorMessage(parts.getOrNull(2).orEmpty(), strings),
             )
             else -> ProtocolReply.Raw(from, text)
         }
     }
 
     /** Pull `error` from SET_ERR JSON body, or return the raw detail. */
-    fun extractErrorMessage(detail: String): String {
+    fun extractErrorMessage(detail: String, strings: StringLookup): String {
         val trimmed = detail.trim()
-        if (trimmed.isEmpty()) return "알 수 없는 오류"
+        if (trimmed.isEmpty()) return strings.get(R.string.msg_unknown_error)
         val fromJson = runCatching {
             val o = JSONObject(trimmed)
             when {
@@ -54,43 +56,35 @@ object LeanDnsProtocol {
     }
 
     /** User-facing SET failure text (detail + short guidance). */
-    fun formatSetFailure(replies: List<ProtocolReply>): String {
+    fun formatSetFailure(replies: List<ProtocolReply>, strings: StringLookup): String {
         if (replies.isEmpty()) {
-            return """
-                장치 응답이 없습니다.
-
-                · 같은 공유기 Wi‑Fi/LAN인지 확인하세요.
-                · 장비가 막 재부팅됐다면 1~2분 뒤 다시 시도하세요.
-                · 토큰이 필요한 장치면 토큰을 입력하세요.
-            """.trimIndent()
+            return strings.get(R.string.msg_set_no_reply)
         }
 
         val errors = replies.mapNotNull { reply ->
             when (reply) {
-                is ProtocolReply.SetErr -> enrichSetError(reply.message)
-                is ProtocolReply.Raw -> enrichSetError(extractErrorMessage(stripSetErrPrefix(reply.text)))
+                is ProtocolReply.SetErr -> enrichSetError(reply.message, strings)
+                is ProtocolReply.Raw -> enrichSetError(
+                    extractErrorMessage(stripSetErrPrefix(reply.text), strings),
+                    strings,
+                )
                 is ProtocolReply.SetOk -> null
                 is ProtocolReply.DiscoverInfo -> null
             }
         }.distinct()
 
         return if (errors.isEmpty()) {
-            "SET 실패 (상세 응답 없음).\n응답: ${replies.joinToString { it.summaryLine() }}"
+            strings.get(
+                R.string.msg_set_failed_no_detail,
+                replies.joinToString { it.summaryLine() },
+            )
         } else {
             errors.joinToString("\n\n")
         }
     }
 
-    fun formatSetSuccess(ip: String): String {
-        return """
-            임시 적용되었습니다.
-
-            수 초 후 http://$ip/leandns/ 로 접속해 시스템 화면에서 120초 안에 LAN 설정을 확정하세요.
-            확정하지 않으면 이전 설정으로 복구됩니다.
-
-            확정·복구 전에는 추가 적용이 거부됩니다.
-        """.trimIndent()
-    }
+    fun formatSetSuccess(ip: String, strings: StringLookup): String =
+        strings.get(R.string.msg_set_success, ip)
 
     private fun stripSetErrPrefix(text: String): String {
         val parts = text.split("|", limit = 3)
@@ -101,17 +95,23 @@ object LeanDnsProtocol {
         }
     }
 
-    private fun enrichSetError(message: String): String {
-        val base = message.trim().ifBlank { "SET 실패" }
+    private fun enrichSetError(message: String, strings: StringLookup): String {
+        val base = message.trim().ifBlank { strings.get(R.string.msg_set_failed) }
+        // Match firmware SET_ERR text (device may reply in Korean or English).
         return when {
             base.contains("다른 네트워크 변경") ->
-                "$base\n\n웹 UI에서 임시 설정을 확정하거나, 120초 후 자동 복구될 때까지 기다린 뒤 다시 시도하세요."
-            base.contains("비활성화") || base.contains("disabled") ->
-                "$base\n\n장치 웹 UI 시스템 화면에서 UDP IP 변경을 허용하세요."
-            base.contains("unauthorized") || base.contains("토큰") || base.contains("token") ->
-                "$base\n\n웹 시스템 화면에 표시된 UDP 토큰을 확인하세요. 토큰이 꺼져 있으면 입력란을 비우세요."
-            base.contains("IP 주소") || base.contains("missing fields") || base.contains("bad json") ->
-                "$base\n\nIP · 서브넷 마스크 · 게이트웨이를 다시 확인하세요."
+                base + strings.get(R.string.msg_set_hint_pending_change)
+            base.contains("비활성화") ||
+                base.contains("disabled", ignoreCase = true) ->
+                base + strings.get(R.string.msg_set_hint_disabled)
+            base.contains("unauthorized", ignoreCase = true) ||
+                base.contains("토큰") ||
+                base.contains("token", ignoreCase = true) ->
+                base + strings.get(R.string.msg_set_hint_token)
+            base.contains("IP 주소") ||
+                base.contains("missing fields", ignoreCase = true) ||
+                base.contains("bad json", ignoreCase = true) ->
+                base + strings.get(R.string.msg_set_hint_fields)
             else -> base
         }
     }
@@ -141,17 +141,16 @@ sealed class ProtocolReply {
         val uiUrl: String get() = "http://$ipAddr/leandns/"
 
         /** Combined status for the device card (SET gate + token policy). */
-        val tokenLabel: String
-            get() = when (setEnabled) {
-                false -> "UDP IP 변경 끔"
-                true -> when (tokenRequired) {
-                    false -> "불필요"
-                    true -> "필요"
-                    null -> "알 수 없음 (필요 가정)"
-                }
-                // Old discoverd omitted set_enabled and always sent token_required=true.
-                null -> "구버전 데몬 · 장치 업데이트 필요"
+        fun tokenLabel(strings: StringLookup): String = when (setEnabled) {
+            false -> strings.get(R.string.token_udp_disabled)
+            true -> when (tokenRequired) {
+                false -> strings.get(R.string.token_not_required)
+                true -> strings.get(R.string.token_required)
+                null -> strings.get(R.string.token_unknown_assume_required)
             }
+            // Old discoverd omitted set_enabled and always sent token_required=true.
+            null -> strings.get(R.string.token_legacy_daemon)
+        }
 
         companion object {
             fun fromJson(from: String, raw: String): DiscoverInfo {

@@ -105,7 +105,7 @@ cmd_prepare() {
 	if [ "$ram" -lt "$min" ]; then
 		write_state error:low_ram
 		resume_helpers
-		json_err "가용 RAM이 부족합니다 (${ram}KB < ${min}KB)."
+		json_err "Insufficient available RAM (${ram}KB < ${min}KB)."
 		return 0
 	fi
 
@@ -120,14 +120,14 @@ cmd_prepare() {
 	if [ "$tmp" -lt "$need_tmp" ]; then
 		write_state error:low_tmp
 		resume_helpers
-		json_err "/tmp 공간이 부족합니다 (${tmp}KB < ${need_tmp}KB)."
+		json_err "Insufficient /tmp space (${tmp}KB < ${need_tmp}KB)."
 		return 0
 	fi
 
 	if [ "$expect" -gt 0 ] && [ "$ram" -lt "$need_ram" ]; then
 		write_state error:low_ram
 		resume_helpers
-		json_err "업로드·업그레이드에 필요한 RAM이 부족합니다 (${ram}KB < ${need_ram}KB)."
+		json_err "Insufficient RAM for upload/upgrade (${ram}KB < ${need_ram}KB)."
 		return 0
 	fi
 
@@ -154,28 +154,28 @@ cmd_abort() {
 test_err_message() {
 	# Prefer a clear hint when users upload factory.bin (no OpenWrt metadata).
 	if grep -qiE 'metadata not present|Image metadata not present' "$LOG.test" 2>/dev/null; then
-		printf '%s' "factory 이미지는 웹 업그레이드에 사용할 수 없습니다. 파일명에 sysupgrade가 들어간 .bin을 사용하세요."
+		printf '%s' "factory images cannot be used for web upgrade. Use a .bin whose name contains sysupgrade."
 		return
 	fi
 	if grep -qiE 'invalid|not supported|device' "$LOG.test" 2>/dev/null; then
 		msg="$(tail -n 4 "$LOG.test" 2>/dev/null | tr '\n' ' ' | sed 's/"/\\"/g')"
-		printf '%s' "이미지가 이 장치에 맞지 않습니다. ${msg}"
+		printf '%s' "Image is not suitable for this device. ${msg}"
 		return
 	fi
 	msg="$(tail -n 4 "$LOG.test" 2>/dev/null | tr '\n' ' ' | sed 's/"/\\"/g')"
-	printf '%s' "이미지 검사에 실패했습니다. ${msg}"
+	printf '%s' "Image verification failed. ${msg}"
 }
 
 cmd_verify() {
 	if [ ! -f "$IMG" ]; then
-		json_err "업로드된 이미지가 없습니다."
+		json_err "No uploaded image."
 		return 0
 	fi
 	sz="$(wc -c < "$IMG" | tr -d ' ')"
 	if [ "$sz" -lt 1048576 ]; then
 		rm -f "$IMG"
 		write_state error:invalid_image
-		json_err "이미지 파일이 너무 작습니다."
+		json_err "Image file is too small."
 		return 0
 	fi
 	write_state testing
@@ -196,12 +196,12 @@ cmd_verify() {
 cmd_apply() {
 	keep="${1:-true}"
 	if [ ! -f "$IMG" ]; then
-		json_err "업로드된 이미지가 없습니다."
+		json_err "No uploaded image."
 		return 0
 	fi
 	sz="$(wc -c < "$IMG" | tr -d ' ')"
 	if [ "$sz" -lt 1048576 ]; then
-		json_err "이미지 파일이 너무 작습니다."
+		json_err "Image file is too small."
 		return 0
 	fi
 
@@ -209,7 +209,7 @@ cmd_apply() {
 	head="$(upgrade_headroom_kb)"
 	# Image already occupies RAM; MemAvailable should still cover headroom.
 	if [ "$ram" -lt "$head" ]; then
-		json_err "sysupgrade 실행에 필요한 가용 RAM이 부족합니다 (${ram}KB < ${head}KB)."
+		json_err "Insufficient available RAM to run sysupgrade (${ram}KB < ${head}KB)."
 		return 0
 	fi
 

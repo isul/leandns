@@ -53,3 +53,7 @@ gradlew.bat assembleRelease
 | `udp/LeanDnsProtocol.kt` | `cmd/leandns-tool/main.go` 프로토콜 상수·JSON |
 | `udp/LeanDnsUdpClient.kt` | `sendRecv` 브로드캐스트/수신 |
 | `ToolViewModel` + UI | `discover` / `set` 명령 |
+
+## 라이선스
+
+LeanDNS와 동일하게 **GPL-2.0-only**. 저장소 루트 [LICENSE](../../LICENSE)를 보세요.

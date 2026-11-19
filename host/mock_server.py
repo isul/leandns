@@ -52,26 +52,26 @@ def valid_upstream(s: str) -> bool:
 
 
 MOCK_RECENT_BLOCKS = [
-    ("googleads.g.doubleclick.net", "광고", "192.168.1.34"),
-    ("pagead2.googlesyndication.com", "광고", "192.168.1.12"),
-    ("analytics.twitter.com", "추적", "192.168.1.23"),
-    ("ads.yahoo.com", "광고", "192.168.1.45"),
-    ("securepubads.g.doubleclick.net", "광고", "192.168.1.34"),
-    ("static.adsafeprotected.com", "추적", "192.168.1.18"),
-    ("adservice.google.com", "광고", "192.168.1.12"),
-    ("pixel.facebook.com", "추적", "192.168.1.23"),
-    ("tpc.googlesyndication.com", "광고", "192.168.1.34"),
-    ("cdn.ampproject.org", "차단", "192.168.1.45"),
-    ("ad.doubleclick.net", "광고", "192.168.1.12"),
-    ("metrics.icloud.com", "추적", "192.168.1.18"),
-    ("ads-api.twitter.com", "광고", "192.168.1.23"),
-    ("googleadservices.com", "광고", "192.168.1.34"),
-    ("tracking.example.test", "추적", "192.168.1.45"),
-    ("partnerad.l.doubleclick.net", "광고", "192.168.1.12"),
-    ("ads.linkedin.com", "광고", "192.168.1.18"),
-    ("bat.bing.com", "추적", "192.168.1.23"),
-    ("adclick.g.doubleclick.net", "광고", "192.168.1.34"),
-    ("cm.g.doubleclick.net", "광고", "192.168.1.45"),
+    ("googleads.g.doubleclick.net", "ad", "192.168.1.34"),
+    ("pagead2.googlesyndication.com", "ad", "192.168.1.12"),
+    ("analytics.twitter.com", "track", "192.168.1.23"),
+    ("ads.yahoo.com", "ad", "192.168.1.45"),
+    ("securepubads.g.doubleclick.net", "ad", "192.168.1.34"),
+    ("static.adsafeprotected.com", "track", "192.168.1.18"),
+    ("adservice.google.com", "ad", "192.168.1.12"),
+    ("pixel.facebook.com", "track", "192.168.1.23"),
+    ("tpc.googlesyndication.com", "ad", "192.168.1.34"),
+    ("cdn.ampproject.org", "block", "192.168.1.45"),
+    ("ad.doubleclick.net", "ad", "192.168.1.12"),
+    ("metrics.icloud.com", "track", "192.168.1.18"),
+    ("ads-api.twitter.com", "ad", "192.168.1.23"),
+    ("googleadservices.com", "ad", "192.168.1.34"),
+    ("tracking.example.test", "track", "192.168.1.45"),
+    ("partnerad.l.doubleclick.net", "ad", "192.168.1.12"),
+    ("ads.linkedin.com", "ad", "192.168.1.18"),
+    ("bat.bing.com", "track", "192.168.1.23"),
+    ("adclick.g.doubleclick.net", "ad", "192.168.1.34"),
+    ("cm.g.doubleclick.net", "ad", "192.168.1.45"),
 ]
 
 
@@ -261,7 +261,7 @@ def handle_api(method: str, body: dict, authed: bool):
     if method == "dns_test":
         host = body.get("host") or STATE["dns"]["dns_test_host"]
         if not isinstance(host, str) or not valid_domain(host):
-            return 200, {"ok": False, "error": "도메인 형식을 확인하세요."}
+            return 200, {"ok": False, "error": "Check the domain format."}
         addresses = [h["ip"] for h in STATE["hosts"] if h["hostname"] == host]
         if host in ("one.one.one.one", "example.com"):
             addresses = ["192.0.2.1"]
@@ -300,7 +300,7 @@ def handle_api(method: str, body: dict, authed: bool):
         return 200, {"ok": True}
     if method == "adblock_update":
         if not STATE["adblock_enabled"]:
-            return 200, {"ok": False, "error": "광고 차단을 먼저 활성화하세요."}
+            return 200, {"ok": False, "error": "Enable ad blocking first."}
         if body.get("force_fail"):
             STATE["adblock_update_result"] = "low_ram"
             return 200, {"ok": False, "error": "update failed; previous list retained"}
@@ -359,18 +359,18 @@ def handle_api(method: str, body: dict, authed: bool):
         size = int(body.get("size") or 0)
         name = body.get("name") or "firmware.bin"
         if size < 1024 * 1024:
-            return 200, {"ok": False, "error": "이미지 파일이 너무 작습니다."}
+            return 200, {"ok": False, "error": "Image file is too small."}
         if "factory" in name.lower() or "sysupgrade" not in name.lower():
             return 200, {
                 "ok": False,
-                "error": "factory.bin은 Firmware Restoration용입니다. *-sysupgrade.bin을 사용하세요.",
+                "error": "factory.bin is for Firmware Restoration. Use *-sysupgrade.bin.",
             }
         STATE["firmware_image"] = {"kb": (size + 1023) // 1024, "name": name}
         STATE["firmware_state"] = "uploaded"
         return 200, {"ok": True, "bytes": size, "path": "/tmp/leandns-sysupgrade.bin"}
     if method == "firmware_verify":
         if not STATE.get("firmware_image"):
-            return 200, {"ok": False, "error": "업로드된 이미지가 없습니다."}
+            return 200, {"ok": False, "error": "No uploaded image."}
         STATE["firmware_state"] = "verified"
         return 200, {"ok": True, "verified": True, "image_kb": STATE["firmware_image"]["kb"]}
     if method == "firmware_abort":
@@ -379,9 +379,9 @@ def handle_api(method: str, body: dict, authed: bool):
         return 200, {"ok": True}
     if method == "firmware_apply":
         if not STATE.get("firmware_image"):
-            return 200, {"ok": False, "error": "업로드된 이미지가 없습니다."}
+            return 200, {"ok": False, "error": "No uploaded image."}
         if STATE.get("firmware_state") != "verified":
-            return 200, {"ok": False, "error": "먼저 이미지 검사를 통과해야 합니다."}
+            return 200, {"ok": False, "error": "Image must pass verification first."}
         STATE["firmware_state"] = "applying"
         STATE["firmware_rebooting"] = True
         def _mock_fw_back():
@@ -435,14 +435,14 @@ def handle_api(method: str, body: dict, authed: bool):
             }
         if method == "network_confirm":
             if not pending:
-                return 200, {"ok": False, "error": "확정할 임시 설정이 없습니다."}
+                return 200, {"ok": False, "error": "No pending temporary settings to confirm."}
             STATE["network_pending"] = None
             return 200, {"ok": True}
         if pending:
-            return 200, {"ok": False, "error": "다른 네트워크 변경이 진행 중입니다."}
+            return 200, {"ok": False, "error": "Another network change is in progress."}
         network = {key: body.get(key, "") for key in ("ipaddr", "netmask", "gateway")}
         if not all(valid_ipv4(address) for address in network.values()):
-            return 200, {"ok": False, "error": "IP 주소, 서브넷 마스크 및 게이트웨이를 확인하세요."}
+            return 200, {"ok": False, "error": "Check IP address, subnet mask, and gateway."}
         # Web UI applies permanently; UDP-style pending is only simulated via network_pending.
         STATE["network"] = network
         STATE["network_pending"] = None
@@ -464,7 +464,7 @@ def handle_api(method: str, body: dict, authed: bool):
             # Legacy: enabled=false meant "no token", not "SET off".
             required = bool(body["enabled"])
         else:
-            return 200, {"ok": False, "error": "required 또는 enabled 값이 필요합니다."}
+            return 200, {"ok": False, "error": "required or enabled value is required."}
         STATE["udp_token_required"] = required
         STATE["udp_set_enabled"] = True
         return 200, {"ok": True, "required": required, "enabled": True}

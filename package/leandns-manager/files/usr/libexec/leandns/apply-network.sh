@@ -84,12 +84,12 @@ case "${1:-}" in
 	--confirm)
 		transaction="$(cat "$PENDING/current" 2>/dev/null || true)"
 		if [ -z "$transaction" ] || [ ! -f "$transaction/ready" ] || ! mkdir "$transaction/decision" 2>/dev/null; then
-			error "확정할 임시 설정이 없거나 아직 적용 중입니다."
+			error "No pending temporary settings, or apply still in progress."
 			exit 0
 		fi
 		if ! cleanup; then
 			rmdir "$transaction/decision"
-			error "임시 설정 확정에 실패했습니다."
+			error "Failed to confirm temporary settings."
 			exit 0
 		fi
 		log "LAN settings confirmed"
@@ -120,7 +120,7 @@ case "${1:-}" in
 	*)
 		# Legacy daemons invoke this path only after their own token check.
 		if [ "$(uci -q get leandns.main.udp_set_enabled || echo 0)" != 1 ]; then
-			error "UDP IP 변경이 비활성화되어 있습니다."
+			error "UDP IP changes are disabled."
 			exit 0
 		fi
 		;;
@@ -131,14 +131,14 @@ netmask="${2:-}"
 gateway="${3:-}"
 for address in "$ipaddr" "$netmask" "$gateway"; do
 	if ! "$VALIDATE" ipv4 "$address"; then
-		error "IP 주소, 서브넷 마스크 및 게이트웨이를 확인하세요."
+		error "Check IP address, subnet mask, and gateway."
 		exit 0
 	fi
 done
 
 if [ "$permanent" = 1 ]; then
 	if [ -d "$PENDING" ]; then
-		error "다른 네트워크 변경이 진행 중입니다."
+		error "Another network change is in progress."
 		exit 0
 	fi
 	# Reply first, then reload so the browser can finish the RPC before the IP moves.
@@ -156,7 +156,7 @@ fi
 
 umask 077
 if ! mkdir "$PENDING" 2>/dev/null; then
-	error "다른 네트워크 변경이 진행 중입니다."
+	error "Another network change is in progress."
 	exit 0
 fi
 trap cleanup EXIT

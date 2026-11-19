@@ -4,6 +4,8 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.net.LinkProperties
 import android.net.wifi.WifiManager
+import com.leandns.tool.StringLookup
+import com.leandns.tool.asStringLookup
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.Inet4Address
@@ -15,6 +17,7 @@ import java.util.Collections
 import kotlin.math.max
 
 class LeanDnsUdpClient(private val context: Context) {
+    private val strings: StringLookup = context.applicationContext.asStringLookup()
 
     fun discover(waitMs: Long = 2_000L): List<ProtocolReply> =
         sendRecv(LeanDnsProtocol.discoverPayload(), waitMs)
@@ -70,7 +73,7 @@ class LeanDnsUdpClient(private val context: Context) {
                     val text = String(packet.data, 0, packet.length, Charsets.UTF_8).trim()
                     val key = "$from|$text"
                     if (key in out) continue
-                    out[key] = LeanDnsProtocol.parseReply(from, text)
+                    out[key] = LeanDnsProtocol.parseReply(from, text, strings)
                 } catch (_: SocketTimeoutException) {
                     // keep listening until deadline
                 }

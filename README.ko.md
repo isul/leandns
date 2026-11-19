@@ -37,6 +37,22 @@ OpenWrt 기반 **초경량 스마트 DNS** 관리 시스템입니다.
 
 설치·복구·보안 등 자세한 절차는 [문서](#문서)를 보세요.
 
+## 다운로드
+
+미리 빌드된 펌웨어·PC 툴·Android 앱: **[Releases · v1.0.0](https://github.com/isul/leandns/releases/tag/v1.0.0)**  
+([latest](https://github.com/isul/leandns/releases/latest))
+
+| 파일 | 용도 |
+|------|------|
+| `leandns-*-asus_rt-ac1200-v2-factory.bin` | 최초 설치 (ASUS Firmware Restoration) |
+| `leandns-*-asus_rt-ac1200-v2-sysupgrade.bin` | 웹 UI / sysupgrade |
+| `leandns-tool-windows-amd64.exe` (+ Linux/macOS) | UDP 장치 검색 / LAN IP 변경 |
+| `leandns-tool-*-android-debug.apk` | Android 동일 기능 (debug 서명) |
+| `SHA256SUMS` | 무결성 검증 |
+
+펌웨어는 **ASUS RT-AC750L** (`asus_rt-ac1200-v2`) 전용입니다. 다른 보드에 올리지 마세요.  
+설치 안내: [docs/ko/installation.md](docs/ko/installation.md)
+
 ## 관리 UI
 
 브라우저에서 `http://<장치IP>/` 또는 `/leandns/`로 접속합니다.  
@@ -91,7 +107,7 @@ LAN IP/게이트웨이 **즉시 영구 적용**, UDP 토큰·SET 허용,
 서브넷이 달라도 **같은 공유기 Wi‑Fi**에 있으면 장치를 찾고 IP를 바꿀 수 있습니다.  
 PC용 `leandns-tool`과 같은 프로토콜(**LEANDNS1 · UDP 37421**)을 씁니다.
 
-소스: [`android/leandns-tool/`](android/leandns-tool/)
+APK: [Releases](https://github.com/isul/leandns/releases/latest) · 소스: [`android/leandns-tool/`](android/leandns-tool/)
 
 ### 장치 검색
 
@@ -116,10 +132,12 @@ UDP SET은 **임시 적용**이므로, 적용 후 **120초 안에** 웹 UI에서
 3. 필요하면 토큰 입력 후 **적용**
 4. 웹 UI에서 120초 안에 LAN 설정 확정
 
-APK 빌드(Windows 11): Android Studio에서 `android\leandns-tool` 열기 → **Build → Build APK(s)**  
+APK는 [Releases](https://github.com/isul/leandns/releases/latest)에서 받거나, 직접 빌드(Windows 11): Android Studio에서 `android\leandns-tool` 열기 → **Build → Build APK(s)**  
 또는 `gradlew.bat assembleDebug` → `app\build\outputs\apk\debug\app-debug.apk`
 
 ## PC에서 같은 작업
+
+바이너리: [Releases](https://github.com/isul/leandns/releases/latest) (Windows / Linux / macOS)
 
 ```bat
 leandns-tool-windows-amd64.exe discover
@@ -131,7 +149,7 @@ leandns-tool-windows-amd64.exe set ^
   --gateway 192.168.34.1
 ```
 
-빌드: `./scripts/build-udp-tool.sh` → `dist/leandns-tool/`  
+소스 빌드: `./scripts/build-udp-tool.sh` → `dist/leandns-tool/`  
 장치 데몬: `./scripts/build-discoverd.sh` (C mipsel softfloat)  
 상세: [docs/ko/udp-tool.md](docs/ko/udp-tool.md)
 

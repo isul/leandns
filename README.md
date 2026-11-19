@@ -37,6 +37,22 @@ Other models may differ in board, image, and recovery paths — check the device
 
 For installation, recovery, security, and other details, see the [Documentation](#documentation) section.
 
+## Download
+
+Prebuilt firmware, PC tools, and the Android app: **[Releases · v1.0.0](https://github.com/isul/leandns/releases/tag/v1.0.0)**  
+([latest](https://github.com/isul/leandns/releases/latest))
+
+| Asset | Purpose |
+|-------|---------|
+| `leandns-*-asus_rt-ac1200-v2-factory.bin` | First install (ASUS Firmware Restoration) |
+| `leandns-*-asus_rt-ac1200-v2-sysupgrade.bin` | Web UI / sysupgrade |
+| `leandns-tool-windows-amd64.exe` (+ Linux/macOS) | UDP discovery / LAN IP change |
+| `leandns-tool-*-android-debug.apk` | Same on Android (debug-signed) |
+| `SHA256SUMS` | Integrity check |
+
+Firmware is for **ASUS RT-AC750L** (`asus_rt-ac1200-v2`) only. Do not flash other boards.  
+Install guide: [docs/installation.md](docs/installation.md)
+
 ## Management UI
 
 Access from a browser at `http://<device-IP>/` or `/leandns/`.  
@@ -91,7 +107,7 @@ restart services, export/import configuration, and perform **web firmware upgrad
 Even across subnets, the app can discover the device and change its IP as long as both are on the **same router's Wi-Fi**.  
 Uses the same protocol as the PC `leandns-tool` (**LEANDNS1 · UDP 37421**).
 
-Source: [`android/leandns-tool/`](android/leandns-tool/)
+APK: [Releases](https://github.com/isul/leandns/releases/latest) · Source: [`android/leandns-tool/`](android/leandns-tool/)
 
 ### Device Discovery
 
@@ -116,10 +132,12 @@ UDP SET is **temporary** — confirm LAN settings in the web UI **within 120 sec
 3. Enter token if required, then tap **Apply**
 4. Confirm LAN settings in the web UI within 120 seconds
 
-Build APK (Windows 11): Open `android\leandns-tool` in Android Studio → **Build → Build APK(s)**  
+Download the APK from [Releases](https://github.com/isul/leandns/releases/latest), or build (Windows 11): Open `android\leandns-tool` in Android Studio → **Build → Build APK(s)**  
 or `gradlew.bat assembleDebug` → `app\build\outputs\apk\debug\app-debug.apk`
 
 ## Same Operations from PC
+
+Binaries: [Releases](https://github.com/isul/leandns/releases/latest) (Windows / Linux / macOS)
 
 ```bat
 leandns-tool-windows-amd64.exe discover
@@ -131,7 +149,7 @@ leandns-tool-windows-amd64.exe set ^
   --gateway 192.168.34.1
 ```
 
-Build: `./scripts/build-udp-tool.sh` → `dist/leandns-tool/`  
+Build from source: `./scripts/build-udp-tool.sh` → `dist/leandns-tool/`  
 Device daemon: `./scripts/build-discoverd.sh` (C mipsel softfloat)  
 Details: [docs/udp-tool.md](docs/udp-tool.md)
 

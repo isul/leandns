@@ -175,7 +175,7 @@ def status_payload():
         "flash_total_kb": flash_total,
         "flash_free_kb": flash_free,
         "cachesize": STATE["dns"]["cachesize"],
-        "version": "1.0.0",
+        "version": "1.0.1",
         "firmware": "OpenWrt 24.10.0",
         "cache_hit_rate": "unsupported",
         "blocked_query_count": block_stats["count_today"],
@@ -223,7 +223,7 @@ def handle_api(method: str, body: dict, authed: bool):
             return 200, {
                 "ok": True,
                 "service": "leandns",
-                "version": "1.0.0",
+                "version": "1.0.1",
                 "firmware": "OpenWrt 24.10.0 (mock)",
             }
         return 200, {"force_password_change": STATE["force_password_change"]}

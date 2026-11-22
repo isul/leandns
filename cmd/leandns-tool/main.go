@@ -162,7 +162,7 @@ func cmdSet(token, ip, netmask, gateway string, wait time.Duration) error {
 		parts := strings.SplitN(r.text, "|", 3)
 		if len(parts) >= 3 && parts[1] == "SET_OK" {
 			fmt.Printf("OK from %s: %s\n", r.from, parts[2])
-			fmt.Printf("수 초 후 http://%s/leandns/ 로 접속하세요.\n", ip)
+			fmt.Printf("즉시 영구 적용됩니다. 수 초 후 http://%s/leandns/ 로 접속하세요.\n", ip)
 			ok = true
 			continue
 		}

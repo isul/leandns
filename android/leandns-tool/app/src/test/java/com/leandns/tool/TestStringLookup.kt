@@ -9,9 +9,9 @@ object TestStringLookup : StringLookup {
             "No device replied.\n\n· Confirm you are on the same router Wi‑Fi/LAN.\n· If the device just rebooted, wait 1–2 minutes and try again.\n· If the device requires a token, enter it.",
         R.string.msg_set_failed_no_detail to "SET failed (no details).\nReplies: %1\$s",
         R.string.msg_set_success to
-            "Applied temporarily.\n\nAfter a few seconds open http://%1\$s/leandns/ and confirm LAN settings on the System screen within 120 seconds.\nIf you do not confirm, the previous settings are restored.\n\nFurther applies are rejected until confirm or rollback.",
+            "Applied permanently on the device.\n\nAfter a few seconds open http://%1\$s/leandns/ to manage the device at the new address.\nSettings are kept; they do not auto-revert.",
         R.string.msg_set_hint_pending_change to
-            "\n\nConfirm the temporary settings in the web UI, or wait for automatic rollback after 120 seconds, then try again.",
+            "\n\nAnother network change is still in progress. Wait a moment, then try again.",
         R.string.msg_set_hint_disabled to
             "\n\nAllow UDP IP change on the device web UI System screen.",
         R.string.msg_set_hint_token to

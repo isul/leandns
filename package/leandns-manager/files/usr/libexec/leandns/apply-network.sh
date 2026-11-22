@@ -1,5 +1,6 @@
 #!/bin/sh
-# Apply LAN changes. Web UI commits permanently; UDP SET stays temporary with timeout restore.
+# Apply LAN changes. Web UI and UDP SET (--web) commit permanently.
+# Legacy path without --web keeps a timed pending journal for old clients.
 set -eu
 
 PENDING=/etc/leandns/network.pending

@@ -99,7 +99,7 @@ json_escape() {
 }
 
 leandns_version="$(tr -d '\r\n' < /etc/leandns/version 2>/dev/null || true)"
-leandns_version="${leandns_version:-1.0.0}"
+leandns_version="${leandns_version:-1.0.1}"
 firmware=
 if [ -r /etc/openwrt_release ]; then
 	# shellcheck disable=SC1091

@@ -79,7 +79,7 @@ class LeanDnsProtocolTest {
         )
         val text = LeanDnsProtocol.formatSetFailure(listOf(reply), strings)
         assertTrue(text.contains("다른 네트워크 변경이 진행 중입니다."))
-        assertTrue(text.contains("120 seconds"))
+        assertTrue(text.contains("Wait a moment"))
     }
 
     @Test
@@ -89,10 +89,10 @@ class LeanDnsProtocolTest {
     }
 
     @Test
-    fun formatSetSuccessMentionsConfirm() {
+    fun formatSetSuccessMentionsPermanentApply() {
         val text = LeanDnsProtocol.formatSetSuccess("192.168.0.250", strings)
         assertTrue(text.contains("192.168.0.250"))
-        assertTrue(text.contains("120 seconds"))
-        assertTrue(text.contains("confirm"))
+        assertTrue(text.contains("permanently"))
+        assertTrue(text.contains("do not auto-revert"))
     }
 }

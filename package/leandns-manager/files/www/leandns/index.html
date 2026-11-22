@@ -310,12 +310,12 @@
             <div class="row">
               <button id="net-apply" type="submit" data-i18n="sys.netApply">Apply network</button>
             </div>
-            <p class="muted" data-i18n="sys.netAfter">If you changed the IP, reconnect at the new address. Only temporary settings from the UDP tool are confirmed below.</p>
+            <p class="muted" data-i18n="sys.netAfter">If you changed the IP, reconnect at the new address. Web and UDP SET apply permanently right away.</p>
           </form>
           <div id="net-pending" class="result sys-pending hidden" role="status">
             <p id="net-pending-text"></p>
             <div class="row">
-              <a id="net-pending-link" data-i18n="sys.openTemp">Open temporary address</a>
+              <a id="net-pending-link" data-i18n="sys.openTemp">Open new address</a>
               <button id="net-confirm" type="button" data-i18n="sys.confirm">Confirm change</button>
               <button id="net-check" type="button" class="secondary" data-i18n="sys.check">Check status</button>
             </div>
@@ -416,7 +416,7 @@ passwd</pre>
           </details>
           <details class="panel">
             <summary data-i18n="help.discover">Device discovery and management IP change</summary>
-            <p data-i18n="help.discoverP">Discover devices on the same LAN with the commands below. If "Require token for UDP IP changes" is on in System, a token is required; if off, SET works without a token. After applying, confirm the change on the System page at the new IP. The Android LeanDNS tool app can discover and configure the same way.</p>
+            <p data-i18n="help.discoverP">Discover devices on the same LAN with the commands below. If "Require token for UDP IP changes" is on in System, a token is required; if off, SET works without a token. Apply from the PC or Android tool to change the LAN IP permanently on the device. Then open the web UI at the new address. The Android LeanDNS tool app can discover and configure the same way.</p>
             <p data-i18n="help.windows">Windows</p>
             <pre class="help-cmd">leandns-tool-windows-amd64.exe discover
 leandns-tool-windows-amd64.exe set --token "YOUR_TOKEN" --ip 192.168.34.250 --netmask 255.255.255.0 --gateway 192.168.34.1</pre>

@@ -120,8 +120,7 @@ View IP, mask, gateway, MAC, version, and token/SET permission, then tap **Open 
 
 Change the discovered device's IP, subnet mask, and gateway, then tap **Apply**.  
 "UDP IP Change" must be enabled in the System screen; enter a token if required (leave blank if disabled).  
-UDP SET is **temporary** — confirm LAN settings in the web UI **within 120 seconds** after applying. (Settings revert to previous values after the timeout.)  
-"Apply Network" in the web UI is immediate and permanent.
+UDP SET is applied **immediately and permanently**, same as "Apply Network" in the web UI.
 
 ![Android — LAN Settings](docs/images/android-lan-set.png)
 
@@ -129,8 +128,8 @@ UDP SET is **temporary** — confirm LAN settings in the web UI **within 120 sec
 
 1. Connect phone to main Wi-Fi
 2. In the app, tap **Discover** → select device
-3. Enter token if required, then tap **Apply**
-4. Confirm LAN settings in the web UI within 120 seconds
+3. Enter token if required, then tap **Apply** (applied permanently on the device)
+4. Open the web UI at the new address to verify
 
 Download the APK from [Releases](https://github.com/isul/leandns/releases/latest), or build (Windows 11): Open `android\leandns-tool` in Android Studio → **Build → Build APK(s)**  
 or `gradlew.bat assembleDebug` → `app\build\outputs\apk\debug\app-debug.apk`

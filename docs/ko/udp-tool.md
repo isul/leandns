@@ -15,7 +15,7 @@
 | PC 툴 | Go `cmd/leandns-tool` → `dist/leandns-tool/` |
 | Android 앱 | Kotlin `android/leandns-tool/` (동일 프로토콜) |
 
-DISCOVER는 인증 없이 현재 설정과 토큰 필요 여부(`token_required`)·SET 허용(`set_enabled`)을 반환합니다. 시스템 화면 「UDP IP 변경에 토큰 필요」가 켜져 있으면 SET에 토큰이 필요하고, 꺼져 있으면 토큰 없이 SET 할 수 있습니다. 웹 UI의 「네트워크 적용」은 즉시 영구 반영됩니다. UDP SET만 임시 적용되며, 새 주소에서 로그인한 뒤 시스템 화면에서 120초 안에 확정하세요. 기한이 지나면 기존 LAN 설정을 복구합니다.
+DISCOVER는 인증 없이 현재 설정과 토큰 필요 여부(`token_required`)·SET 허용(`set_enabled`)을 반환합니다. 시스템 화면 「UDP IP 변경에 토큰 필요」가 켜져 있으면 SET에 토큰이 필요하고, 꺼져 있으면 토큰 없이 SET 할 수 있습니다. 웹 UI의 「네트워크 적용」과 UDP SET은 모두 **즉시 영구 반영**됩니다. 적용 후 새 주소의 웹 UI로 접속하세요.
 
 ## 빌드 (개발 PC)
 
@@ -79,7 +79,7 @@ gradlew.bat assembleDebug
 
 ## 웹 UI
 
-시스템 화면에서 LAN 설정 즉시 적용, UDP 임시 변경 확정, UDP 토큰 필요 여부, 토큰 표시와 재발급을 관리합니다.
+시스템 화면에서 LAN 설정 즉시 영구 적용, UDP 토큰 필요 여부, 토큰 표시와 재발급을 관리합니다.
 
 ## 참고
 

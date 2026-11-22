@@ -95,7 +95,7 @@ EOF
 		case "$method" in
 			ping)
 				ver="$(tr -d '\r\n' < /etc/leandns/version 2>/dev/null || true)"
-				ver="${ver:-1.0.0}"
+				ver="${ver:-1.0.1}"
 				fw=
 				if [ -r /etc/openwrt_release ]; then
 					# shellcheck disable=SC1091

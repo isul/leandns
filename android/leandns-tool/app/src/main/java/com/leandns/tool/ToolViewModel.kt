@@ -194,7 +194,7 @@ class ToolViewModel(app: Application) : AndroidViewModel(app) {
                             it.copy(
                                 busy = false,
                                 rawReplies = raw,
-                                status = strings.get(R.string.status_set_pending_confirm),
+                                status = strings.get(R.string.status_set_applied),
                                 statusIsError = false,
                                 lastSetOk = true,
                                 resultDialog = ResultDialog(

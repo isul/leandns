@@ -214,7 +214,7 @@ fi
 
 # Friendly distribution names (keep OpenWrt IB originals for support/debug).
 LEAN_VER="$(tr -d ' \t\r\n' < "$ROOT/package/leandns-manager/files/etc/leandns/version" 2>/dev/null || true)"
-LEAN_VER="${LEAN_VER:-1.0.0}"
+LEAN_VER="${LEAN_VER:-1.0.1}"
 IB_PREFIX="openwrt-${OPENWRT_VERSION}-${TARGET}-${SUBTARGET}-${PROFILE}-squashfs"
 SYSU_SRC="$DEST/bin/${IB_PREFIX}-sysupgrade.bin"
 FACT_SRC="$DEST/bin/${IB_PREFIX}-factory.bin"

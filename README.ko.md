@@ -120,8 +120,7 @@ IP·마스크·게이트웨이·MAC·버전·토큰/SET 허용 여부를 확인�
 
 발견한 장치의 IP / 서브넷 마스크 / 게이트웨이를 바꾼 뒤 **적용**합니다.  
 시스템 화면에서 **UDP IP 변경**이 켜져 있어야 하며, 토큰이 필요하면 입력합니다(끄면 비워 둠).  
-UDP SET은 **임시 적용**이므로, 적용 후 **120초 안에** 웹 UI에서 LAN 설정을 확정하세요. (기한 지나면 이전 설정으로 복구)  
-웹 UI의 「네트워크 적용」은 즉시 영구 반영됩니다.
+UDP SET은 웹 UI 「네트워크 적용」과 같이 **즉시 영구 반영**됩니다.
 
 ![Android — LAN 설정](docs/images/android-lan-set.png)
 
@@ -129,8 +128,8 @@ UDP SET은 **임시 적용**이므로, 적용 후 **120초 안에** 웹 UI에서
 
 1. 폰을 메인 Wi‑Fi에 연결
 2. 앱에서 **검색** → 장치 선택
-3. 필요하면 토큰 입력 후 **적용**
-4. 웹 UI에서 120초 안에 LAN 설정 확정
+3. 필요하면 토큰 입력 후 **적용** (기기에 즉시 영구 반영)
+4. 새 주소의 웹 UI로 접속해 확인
 
 APK는 [Releases](https://github.com/isul/leandns/releases/latest)에서 받거나, 직접 빌드(Windows 11): Android Studio에서 `android\leandns-tool` 열기 → **Build → Build APK(s)**  
 또는 `gradlew.bat assembleDebug` → `app\build\outputs\apk\debug\app-debug.apk`

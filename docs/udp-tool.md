@@ -15,7 +15,7 @@ When the main router subnet changes and you can no longer reach the management I
 | PC tool | Go `cmd/leandns-tool` → `dist/leandns-tool/` |
 | Android app | Kotlin `android/leandns-tool/` (same protocol) |
 
-DISCOVER returns current settings and `token_required`/`set_enabled` flags without authentication. If "Require token for UDP IP change" is on in the System screen, a token is required for SET; if off, SET can be performed without a token. The web UI "Apply Network" is permanent and immediate. Only UDP SET is temporary — log in from the new address and confirm in the System screen within 120 seconds, or the previous LAN settings will be restored.
+DISCOVER returns current settings and `token_required`/`set_enabled` flags without authentication. If "Require token for UDP IP change" is on in the System screen, a token is required for SET; if off, SET can be performed without a token. Both the web UI "Apply Network" and UDP SET are **immediate and permanent**. After applying, open the web UI at the new address.
 
 ## Build (dev PC)
 
@@ -79,7 +79,7 @@ Connect your phone to the home main Wi-Fi, then in the app tap **Discover** → 
 
 ## Web UI
 
-The System screen manages immediate permanent LAN settings, confirmation of UDP temporary changes, UDP token requirements, and token display/regeneration.
+The System screen manages immediate permanent LAN settings, UDP token requirements, and token display/regeneration.
 
 ## Notes
 

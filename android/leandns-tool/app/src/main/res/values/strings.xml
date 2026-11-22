@@ -48,7 +48,7 @@
     <string name="status_found_count">Found %1$d device(s)</string>
     <string name="status_set_in_progress">SET → %1$s / %2$s gateway %3$s</string>
     <string name="status_set_failed">SET failed</string>
-    <string name="status_set_pending_confirm">Applied temporarily · confirm in web UI within 120s</string>
+    <string name="status_set_applied">Applied permanently on the device</string>
 
     <string name="dialog_discover_failed_title">Search failed</string>
     <string name="dialog_input_required_title">Check input</string>
@@ -62,8 +62,8 @@
     <string name="msg_set_failed">SET failed</string>
     <string name="msg_set_failed_no_detail">SET failed (no details).\nReplies: %1$s</string>
     <string name="msg_set_no_reply">No device replied.\n\n· Confirm you are on the same router Wi‑Fi/LAN.\n· If the device just rebooted, wait 1–2 minutes and try again.\n· If the device requires a token, enter it.</string>
-    <string name="msg_set_success">Applied temporarily.\n\nAfter a few seconds open http://%1$s/leandns/ and confirm LAN settings on the System screen within 120 seconds.\nIf you do not confirm, the previous settings are restored.\n\nFurther applies are rejected until confirm or rollback.</string>
-    <string name="msg_set_hint_pending_change">\n\nConfirm the temporary settings in the web UI, or wait for automatic rollback after 120 seconds, then try again.</string>
+    <string name="msg_set_success">Applied permanently on the device.\n\nAfter a few seconds open http://%1$s/leandns/ to manage the device at the new address.\nSettings are kept; they do not auto-revert.</string>
+    <string name="msg_set_hint_pending_change">\n\nAnother network change is still in progress. Wait a moment, then try again.</string>
     <string name="msg_set_hint_disabled">\n\nAllow UDP IP change on the device web UI System screen.</string>
     <string name="msg_set_hint_token">\n\nCheck the UDP token shown on the web System screen. If the token is off, leave the field blank.</string>
     <string name="msg_set_hint_fields">\n\nDouble-check IP, subnet mask, and gateway.</string>

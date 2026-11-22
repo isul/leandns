@@ -48,7 +48,7 @@
     <string name="status_found_count">발견 %1$d대</string>
     <string name="status_set_in_progress">SET → %1$s / %2$s 게이트웨이 %3$s</string>
     <string name="status_set_failed">SET 실패</string>
-    <string name="status_set_pending_confirm">임시 적용됨 · 웹에서 120초 안 확정</string>
+    <string name="status_set_applied">기기에 즉시 영구 적용됨</string>
 
     <string name="dialog_discover_failed_title">검색 실패</string>
     <string name="dialog_input_required_title">입력 확인</string>
@@ -62,8 +62,8 @@
     <string name="msg_set_failed">SET 실패</string>
     <string name="msg_set_failed_no_detail">SET 실패 (상세 응답 없음).\n응답: %1$s</string>
     <string name="msg_set_no_reply">장치 응답이 없습니다.\n\n· 같은 공유기 Wi‑Fi/LAN인지 확인하세요.\n· 장비가 막 재부팅됐다면 1~2분 뒤 다시 시도하세요.\n· 토큰이 필요한 장치면 토큰을 입력하세요.</string>
-    <string name="msg_set_success">임시 적용되었습니다.\n\n수 초 후 http://%1$s/leandns/ 로 접속해 시스템 화면에서 120초 안에 LAN 설정을 확정하세요.\n확정하지 않으면 이전 설정으로 복구됩니다.\n\n확정·복구 전에는 추가 적용이 거부됩니다.</string>
-    <string name="msg_set_hint_pending_change">\n\n웹 UI에서 임시 설정을 확정하거나, 120초 후 자동 복구될 때까지 기다린 뒤 다시 시도하세요.</string>
+    <string name="msg_set_success">기기에 즉시 영구 적용되었습니다.\n\n수 초 후 http://%1$s/leandns/ 로 접속해 새 주소에서 관리하세요.\n설정은 유지되며 자동으로 되돌리지 않습니다.</string>
+    <string name="msg_set_hint_pending_change">\n\n다른 네트워크 변경이 아직 진행 중입니다. 잠시 후 다시 시도하세요.</string>
     <string name="msg_set_hint_disabled">\n\n장치 웹 UI 시스템 화면에서 UDP IP 변경을 허용하세요.</string>
     <string name="msg_set_hint_token">\n\n웹 시스템 화면에 표시된 UDP 토큰을 확인하세요. 토큰이 꺼져 있으면 입력란을 비우세요.</string>
     <string name="msg_set_hint_fields">\n\nIP · 서브넷 마스크 · 게이트웨이를 다시 확인하세요.</string>

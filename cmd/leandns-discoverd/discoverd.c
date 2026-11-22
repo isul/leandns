@@ -166,7 +166,7 @@ static void handle(int sock, struct sockaddr_in *peer, socklen_t peerlen, char *
 		get_mac(mac, sizeof(mac));
 		snprintf(reply, sizeof(reply),
 			 MAGIC "|DISCOVER_OK|"
-			 "{\"name\":\"LeanDNS\",\"version\":\"1.0.0\","
+			 "{\"name\":\"LeanDNS\",\"version\":\"1.0.1\","
 			 "\"ipaddr\":\"%s\",\"netmask\":\"%s\",\"gateway\":\"%s\",\"mac\":\"%s\","
 			 "\"token_required\":%s,\"set_enabled\":%s}",
 			 ip, mask, gw, mac,
@@ -205,13 +205,13 @@ static void handle(int sock, struct sockaddr_in *peer, socklen_t peerlen, char *
 		return;
 	}
 
-	/* Quote-safe: values already validated as IPv4 dotted quads. */
+	/* Permanent apply (same as web UI). Quote-safe: IPv4 dotted quads only. */
 	snprintf(cmd, sizeof(cmd),
-		 "/usr/libexec/leandns/apply-network.sh '%s' '%s' '%s'",
+		 "/usr/libexec/leandns/apply-network.sh --web '%s' '%s' '%s'",
 		 ip2, mask2, gw2);
 	f = popen(cmd, "r");
 	if (!f) {
-		reply_err(sock, peer, peerlen, "could not stage LAN settings");
+		reply_err(sock, peer, peerlen, "could not apply LAN settings");
 		return;
 	}
 	nread = fread(apply_out, 1, sizeof(apply_out) - 1, f);
@@ -224,7 +224,7 @@ static void handle(int sock, struct sockaddr_in *peer, socklen_t peerlen, char *
 			snprintf(reply, sizeof(reply), MAGIC "|SET_ERR|%s", apply_out);
 			sendto(sock, reply, strlen(reply), 0, (struct sockaddr *)peer, peerlen);
 		} else {
-			reply_err(sock, peer, peerlen, "could not stage LAN settings");
+			reply_err(sock, peer, peerlen, "could not apply LAN settings");
 		}
 		return;
 	}

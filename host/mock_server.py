@@ -147,7 +147,7 @@ STATE = {
     },
     "udp_token": "demoToken0123456789abcd",
     "udp_set_enabled": True,
-    "udp_token_required": True,
+    "udp_token_required": False,
     "network_pending": None,
 }
 
@@ -451,7 +451,7 @@ def handle_api(method: str, body: dict, authed: bool):
         STATE["udp_set_enabled"] = True
         result = {
             "port": 37421,
-            "required": bool(STATE.get("udp_token_required", True)),
+            "required": bool(STATE.get("udp_token_required", False)),
             "enabled": True,
         }
         if body.get("reveal") is True:

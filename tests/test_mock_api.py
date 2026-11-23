@@ -162,15 +162,16 @@ def main():
     check(probe["ok"] is False, "invalid probe domain rejected")
 
     _, token_info = call("udp_token_get", sid=sid)
-    check(token_info["enabled"] is True and token_info["required"] is True and "token" not in token_info,
-          "UDP SET on by default with token required and token hidden")
+    check(token_info["enabled"] is True and token_info["required"] is False and "token" not in token_info,
+          "UDP SET on by default with token not required and token hidden")
     _, token_info = call("udp_token_get", {"reveal": True}, sid)
     check(bool(token_info["token"]), "authenticated token reveal")
+    _, enabled = call("udp_token_set", {"required": True}, sid)
+    check(enabled["ok"] is True and enabled["required"] is True and enabled["enabled"] is True,
+          "token can be required while UDP SET stays allowed")
     _, off = call("udp_token_set", {"required": False}, sid)
     check(off["ok"] is True and off["required"] is False and off["enabled"] is True,
-          "token can be disabled while UDP SET stays allowed")
-    _, enabled = call("udp_token_set", {"required": True}, sid)
-    check(enabled["enabled"] is True and enabled["required"] is True, "token can be required again")
+          "token can be disabled again")
 
     candidate = {"ipaddr": "192.168.10.250", "netmask": "255.255.255.0", "gateway": "192.168.10.1"}
     _, applied = call("network_set", candidate, sid)

@@ -44,12 +44,12 @@ static void uci_get(const char *key, char *out, size_t outsz, const char *def)
 	pclose(f);
 }
 
-/* Missing or any value other than 0 keeps the token check on. */
+/* Token check is on only when explicitly enabled (default off). */
 static int udp_token_required(void)
 {
 	char v[16];
-	uci_get("leandns.main.udp_token_required", v, sizeof(v), "1");
-	return strcmp(v, "0") != 0;
+	uci_get("leandns.main.udp_token_required", v, sizeof(v), "0");
+	return strcmp(v, "1") == 0;
 }
 
 /* SET is allowed only when explicitly enabled (default off in older configs). */

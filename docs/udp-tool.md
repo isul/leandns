@@ -11,7 +11,7 @@ When the main router subnet changes and you can no longer reach the management I
 | Device daemon | `leandns-discoverd` (C mipsel softfloat) UDP **37421** |
 | Token | `/etc/leandns/udp.token` (view or regenerate in the web System menu) |
 | UDP IP change | UCI `leandns.main.udp_set_enabled` (default `1`, always allowed) |
-| UDP token | UCI `leandns.main.udp_token_required` (default `1`) |
+| UDP token | UCI `leandns.main.udp_token_required` (default `0`) |
 | PC tool | Go `cmd/leandns-tool` → `dist/leandns-tool/` |
 | Android app | Kotlin `android/leandns-tool/` (same protocol) |
 

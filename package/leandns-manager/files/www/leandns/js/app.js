@@ -667,7 +667,7 @@
       if (infoFlash) infoFlash.textContent = fmtBytesKb(s.flash_free_kb) + ' / ' + fmtBytesKb(s.flash_total_kb);
       if (infoFlashLabel) infoFlashLabel.textContent = flashLabel;
       updateNetwork(n);
-      $('#udp-token-required').checked = udpTok.required !== false;
+      $('#udp-token-required').checked = udpTok.required === true;
       $('#udp-token-required').disabled = false;
       try {
         await refreshFirmwareStatus();
@@ -920,7 +920,7 @@
         try {
           const r = await LeanAPI.call('udp_token_set', { required, enabled: true });
           if (r.ok === false) throw new Error(r.error || t('msg.setFail'));
-          box.checked = r.required !== false;
+          box.checked = r.required === true;
           showToast(required ? t('msg.udpTokenOn') : t('msg.udpTokenOff'), true);
         } catch (e) {
           box.checked = !required;

@@ -11,7 +11,7 @@
 | 장치 데몬 | `leandns-discoverd` (C mipsel softfloat) UDP **37421** |
 | 토큰 | `/etc/leandns/udp.token` (웹 시스템 메뉴에서 표시 또는 재발급) |
 | UDP IP 변경 | UCI `leandns.main.udp_set_enabled` (기본 `1`, 항상 허용) |
-| UDP 토큰 | UCI `leandns.main.udp_token_required` (기본 `1`) |
+| UDP 토큰 | UCI `leandns.main.udp_token_required` (기본 `0`) |
 | PC 툴 | Go `cmd/leandns-tool` → `dist/leandns-tool/` |
 | Android 앱 | Kotlin `android/leandns-tool/` (동일 프로토콜) |
 

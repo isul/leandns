@@ -27,7 +27,7 @@ udp_enabled() {
 }
 
 udp_token_required() {
-	[ "$(uci -q get leandns.main.udp_token_required || echo 1)" = 1 ]
+	[ "$(uci -q get leandns.main.udp_token_required || echo 0)" = 1 ]
 }
 
 udp_required_json() {

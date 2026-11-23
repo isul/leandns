@@ -39,7 +39,7 @@ OpenWrt 기반 **초경량 스마트 DNS** 관리 시스템입니다.
 
 ## 다운로드
 
-미리 빌드된 펌웨어·PC 툴·Android 앱: **[Releases · v1.0.0](https://github.com/isul/leandns/releases/tag/v1.0.0)**  
+미리 빌드된 펌웨어·PC 툴·Android 앱: **[Releases · v1.0.1](https://github.com/isul/leandns/releases/tag/v1.0.1)**  
 ([latest](https://github.com/isul/leandns/releases/latest))
 
 | 파일 | 용도 |

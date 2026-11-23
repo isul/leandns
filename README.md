@@ -39,7 +39,7 @@ For installation, recovery, security, and other details, see the [Documentation]
 
 ## Download
 
-Prebuilt firmware, PC tools, and the Android app: **[Releases · v1.0.0](https://github.com/isul/leandns/releases/tag/v1.0.0)**  
+Prebuilt firmware, PC tools, and the Android app: **[Releases · v1.0.1](https://github.com/isul/leandns/releases/tag/v1.0.1)**
 ([latest](https://github.com/isul/leandns/releases/latest))
 
 | Asset | Purpose |
